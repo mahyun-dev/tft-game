@@ -60,27 +60,34 @@ class BattleSystem {
     // 전투 실행
     runBattle(playerTeam, enemyTeam, resolve) {
         let ticks = 0;
-        const maxTicks = 30000 / this.updateInterval; // 30초 제한
+        const maxTicks = 60000 / this.updateInterval; // 60초 제한
         
         const battleLoop = setInterval(() => {
             ticks++;
             
-            // 승리 조건 체크
+            // 승리 조건 체크 - 한 팀이 전멸했는지만 확인
             const playersAlive = playerTeam.filter(u => !u.isDead).length;
             const enemiesAlive = enemyTeam.filter(u => !u.isDead).length;
             
+            // 한쪽이 전멸하거나 시간 초과 시에만 전투 종료
             if (playersAlive === 0 || enemiesAlive === 0 || ticks >= maxTicks) {
                 clearInterval(battleLoop);
                 
-                // 승리 판정 명확하게
+                // 승리 판정
                 let winner;
                 if (playersAlive > 0 && enemiesAlive === 0) {
                     winner = 'player'; // 플레이어만 생존
                 } else if (enemiesAlive > 0 && playersAlive === 0) {
                     winner = 'enemy'; // 적만 생존
-                } else if (playersAlive > 0 && enemiesAlive > 0) {
+                } else if (ticks >= maxTicks) {
                     // 시간 초과 - 더 많이 생존한 쪽이 승리
-                    winner = playersAlive > enemiesAlive ? 'player' : 'enemy';
+                    if (playersAlive > enemiesAlive) {
+                        winner = 'player';
+                    } else if (enemiesAlive > playersAlive) {
+                        winner = 'enemy';
+                    } else {
+                        winner = 'draw'; // 동일한 수
+                    }
                 } else {
                     winner = 'draw'; // 둘 다 0
                 }
@@ -105,6 +112,11 @@ class BattleSystem {
     // 유닛 업데이트
     updateUnits(allies, enemies) {
         allies.forEach(unit => {
+            // 체력이 0 이하면 사망 처리
+            if (unit.currentHp <= 0 && !unit.isDead) {
+                this.handleDeath(unit, allies, enemies);
+            }
+            
             if (unit.isDead || unit.stunned) {
                 if (unit.stunned) {
                     unit.stunnedTime = (unit.stunnedTime || 0) + this.updateInterval;
@@ -351,6 +363,20 @@ class BattleSystem {
         
         // 원래 공격력 복구
         unit.stats.attackDamage = originalDamage;
+        
+        // 스킬로 인한 사망 체크 (모든 적)
+        enemies.forEach(enemy => {
+            if (enemy.currentHp <= 0 && !enemy.isDead) {
+                this.handleDeath(enemy, enemies, allies);
+            }
+        });
+        
+        // 아군도 체크 (일부 스킬이 아군에게 영향 줄 수 있음)
+        allies.forEach(ally => {
+            if (ally.currentHp <= 0 && !ally.isDead) {
+                this.handleDeath(ally, allies, enemies);
+            }
+        });
         
         // 아이템 효과 처리
         if (unit.items) {

@@ -185,7 +185,7 @@ const CHAMPIONS = [
     },
     {
         id: 'mechanized_infantry',
-        name: '기보병',
+        name: '기계화 보병',
         cost: 2,
         tier: 2,
         traits: ['기보', '보병'],

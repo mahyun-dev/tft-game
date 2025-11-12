@@ -145,11 +145,6 @@ function updateUI() {
     // 플레이어 정보
     updatePlayerInfo(state.player);
     
-    // 현재 대전 상대 정보
-    if (state.currentOpponent) {
-        updateOpponentInfo(state.currentOpponent);
-    }
-    
     // 전체 플레이어 순위
     updatePlayerList(state.allPlayers);
     
@@ -187,15 +182,6 @@ function updatePlayerInfo(player) {
         streakText = '-';
     }
     document.getElementById('streakInfo').textContent = streakText;
-}
-
-// 대전 상대 정보 업데이트
-function updateOpponentInfo(opponent) {
-    document.getElementById('opponentName').textContent = opponent.name;
-    document.getElementById('aiLevel').textContent = opponent.level;
-    document.getElementById('aiUnits').textContent = opponent.units;
-    document.getElementById('aiHealth').textContent = `${opponent.health} HP`;
-    document.getElementById('aiHealthBar').style.width = `${opponent.health}%`;
 }
 
 // 플레이어 목록 업데이트 (8명 배틀로얄)

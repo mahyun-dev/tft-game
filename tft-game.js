@@ -102,11 +102,11 @@ class TFTGame {
     start() {
         this.round = 1;
         this.stage = 1;
-        this.player.gold = 2;
+        this.player.gold = 4;
         
         // 모든 AI에게 초기 골드 지급
         this.aiPlayers.forEach(ai => {
-            ai.gold = 2;
+            ai.gold = 4;
             
             // AI에게도 시작 챔피언 1개 지급
             const tier1Champions = CHAMPIONS.filter(c => c.cost === 1);
@@ -812,13 +812,14 @@ function getCreepRewards(round) {
     
     // 라운드별 보상 설정
     if (round === 1) {
-        // 1라운드: 골드 1개
-        rewards.gold = 1;
-    } else if (round === 2) {
-        // 2라운드: 골드 2개
+        // 1라운드: 골드 2개
         rewards.gold = 2;
+    } else if (round === 2) {
+        // 2라운드: 골드 3개
+        rewards.gold = 3;
     } else if (round === 3) {
-        // 3라운드: 랜덤 기본 아이템 1개
+        // 3라운드: 골드2, 랜덤 기본 아이템 1개
+        rewards.gold = 2;
         if (baseItemsArray.length > 0) {
             rewards.items.push(baseItemsArray[Math.floor(Math.random() * baseItemsArray.length)]);
         }
