@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <!-- 배경 -->
+  <rect width="192" height="192" fill="#3d5a3d"/>
+  
+  <!-- 테두리 원 -->
+  <circle cx="96" cy="96" r="70" fill="#2a3d2a" stroke="#ffd700" stroke-width="4"/>
+  
+  <!-- 중앙 아이콘 - 별 -->
+  <polygon points="96,40 106,70 136,70 112,88 122,118 96,100 70,118 80,88 56,70 86,70" fill="#ffd700"/>
+  
+  <!-- 텍스트 -->
+  <text x="96" y="160" font-family="Arial, sans-serif" font-size="18" font-weight="bold" text-anchor="middle" fill="#ffd700">전술 체스</text>
+</svg>

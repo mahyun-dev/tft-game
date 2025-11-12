@@ -3,10 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <!-- PWA 메타 태그 -->
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="전술 체스">
+    <meta name="theme-color" content="#3d5a3d">
+    <meta name="description" content="한국군 11사단 테마의 전략 오토배틀러 게임">
+    
     <title>11사단 기갑수색대대 - 전술 체스</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- iOS 아이콘 -->
+    <link rel="apple-touch-icon" href="icon-192.svg">
+    <link rel="apple-touch-icon" sizes="192x192" href="icon-192.svg">
+    <link rel="apple-touch-icon" sizes="512x512" href="icon-512.svg">
+    
+    <!-- 일반 파비콘 -->
+    <link rel="icon" type="image/svg+xml" href="icon-192.svg">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+    
     <link rel="stylesheet" href="tft-style.css">
 </head>
 <body>
@@ -160,7 +179,10 @@
     <!-- 모달: 전투 화면 -->
     <div id="battleModal" class="modal">
         <div class="modal-content battle-content">
-            <h2>전투 중...</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h2 style="margin: 0;">전투 중... <span id="battleTimer" style="color: #f39c12;">60</span>초</h2>
+                <button id="minimizeBattleBtn" class="btn btn-secondary" style="padding: 5px 15px; font-size: 12px;">최소화</button>
+            </div>
             <div id="battleAnimation" class="battle-animation">
                 <canvas id="battleCanvas" width="600" height="400"></canvas>
             </div>
@@ -169,6 +191,14 @@
                 <p id="battleResultMessage"></p>
                 <button id="continueBattleBtn" class="btn btn-primary">계속</button>
             </div>
+        </div>
+    </div>
+    
+    <!-- 최소화된 전투 표시 -->
+    <div id="battleMinimized" class="battle-minimized" style="display: none;">
+        <div class="battle-mini-content">
+            <span>⚔️ 전투 진행 중... <span id="battleTimerMini" style="color: #f39c12;">60</span>초</span>
+            <button id="restoreBattleBtn" class="btn btn-info" style="padding: 5px 15px; font-size: 12px; margin-left: 15px;">전투 보기</button>
         </div>
     </div>
 
@@ -230,5 +260,38 @@
     <script src="tft-ai.js"></script>
     <script src="tft-game.js"></script>
     <script src="tft-ui.js"></script>
+    
+    <!-- PWA Service Worker 등록 -->
+    <script>
+        // Service Worker 등록
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then((registration) => {
+                        console.log('✅ Service Worker 등록 성공:', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.log('❌ Service Worker 등록 실패:', error);
+                    });
+            });
+        }
+
+        // iOS Safari 홈 화면 추가 안내
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            
+            // 설치 안내 표시 (선택사항)
+            console.log('💡 홈 화면에 추가할 수 있습니다!');
+        });
+
+        // 설치 완료 이벤트
+        window.addEventListener('appinstalled', () => {
+            console.log('✅ PWA가 설치되었습니다!');
+            deferredPrompt = null;
+        });
+    </script>
 </body>
 </html>
+

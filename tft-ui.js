@@ -99,6 +99,12 @@ function setupEventListeners() {
     document.getElementById('continueBattleBtn').addEventListener('click', () => {
         document.getElementById('battleModal').classList.remove('active');
         document.getElementById('battleResult').style.display = 'none';
+        document.getElementById('battleMinimized').style.display = 'none';
+        
+        // 다음 라운드로 진행
+        if (currentGame && !currentGame.isGameOver) {
+            currentGame.nextRound();
+        }
         
         // UI 업데이트
         updateUI();
@@ -107,6 +113,17 @@ function setupEventListeners() {
     document.getElementById('restartBtn').addEventListener('click', () => {
         document.getElementById('gameOverModal').classList.remove('active');
         initializeGame();
+    });
+    
+    // 전투 모달 최소화/복원
+    document.getElementById('minimizeBattleBtn').addEventListener('click', () => {
+        document.getElementById('battleModal').classList.remove('active');
+        document.getElementById('battleMinimized').style.display = 'block';
+    });
+    
+    document.getElementById('restoreBattleBtn').addEventListener('click', () => {
+        document.getElementById('battleModal').classList.add('active');
+        document.getElementById('battleMinimized').style.display = 'none';
     });
     
     // 스카우트 모달 닫기
@@ -739,6 +756,21 @@ function startBattleSequence() {
     modal.classList.add('active');
     document.getElementById('battleResult').style.display = 'none';
     
+    // 최소화 바 숨김
+    document.getElementById('battleMinimized').style.display = 'none';
+    
+    // 전투 타이머 초기화 (모달과 최소화 바 모두)
+    const battleTimerEl = document.getElementById('battleTimer');
+    const battleTimerMiniEl = document.getElementById('battleTimerMini');
+    if (battleTimerEl) {
+        battleTimerEl.textContent = '60';
+        battleTimerEl.style.color = '#2ecc71'; // 초록색
+    }
+    if (battleTimerMiniEl) {
+        battleTimerMiniEl.textContent = '60';
+        battleTimerMiniEl.style.color = '#2ecc71'; // 초록색
+    }
+    
     // 캔버스 애니메이션 시작 (전역 변수로 제어)
     window.battleAnimationRunning = true;
     animateBattle();
@@ -1095,7 +1127,18 @@ function setupBattleResultCallback() {
         // 애니메이션 중지
         window.battleAnimationRunning = false;
         
-        // UI에 전투 결과 표시
+        // 최소화된 상태라면 모달 복원
+        const battleMinimized = document.getElementById('battleMinimized');
+        const battleModal = document.getElementById('battleModal');
+        if (battleMinimized.style.display !== 'none') {
+            battleModal.classList.add('active');
+            battleMinimized.style.display = 'none';
+        }
+        
+        // 원본 로직 먼저 실행 (게임 상태 업데이트)
+        originalHandleBattleResult(result, isPVE);
+        
+        // UI에 전투 결과 표시 (약간의 딜레이 후)
         setTimeout(() => {
             const isVictory = result.winner === 'player';
             
@@ -1124,10 +1167,7 @@ function setupBattleResultCallback() {
                 }
                 addLog(`❌ 라운드 ${this.round} 패배`);
             }
-        }, 1500);
-        
-        // 원본 로직 실행 (이게 다음 라운드로 넘어감)
-        originalHandleBattleResult(result, isPVE);
+        }, 500);
     };
 }
 

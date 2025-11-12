@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>아이콘 생성</title>
+</head>
+<body>
+    <canvas id="canvas192" width="192" height="192" style="border:1px solid black; margin: 10px;"></canvas>
+    <canvas id="canvas512" width="512" height="512" style="border:1px solid black; margin: 10px;"></canvas>
+
+    <script>
+        // 192x192 아이콘 생성
+        const canvas192 = document.getElementById('canvas192');
+        const ctx192 = canvas192.getContext('2d');
+        
+        // 배경
+        ctx192.fillStyle = '#3d5a3d';
+        ctx192.fillRect(0, 0, 192, 192);
+        
+        // 헬멧 아이콘 (🪖)
+        ctx192.font = 'bold 120px Arial';
+        ctx192.textAlign = 'center';
+        ctx192.textBaseline = 'middle';
+        ctx192.fillText('🪖', 96, 96);
+        
+        // 텍스트
+        ctx192.font = 'bold 24px Arial';
+        ctx192.fillStyle = '#ffd700';
+        ctx192.fillText('전술', 96, 150);
+        
+        // 512x512 아이콘 생성
+        const canvas512 = document.getElementById('canvas512');
+        const ctx512 = canvas512.getContext('2d');
+        
+        // 배경
+        ctx512.fillStyle = '#3d5a3d';
+        ctx512.fillRect(0, 0, 512, 512);
+        
+        // 헬멧 아이콘
+        ctx512.font = 'bold 320px Arial';
+        ctx512.textAlign = 'center';
+        ctx512.textBaseline = 'middle';
+        ctx512.fillText('🪖', 256, 256);
+        
+        // 텍스트
+        ctx512.font = 'bold 64px Arial';
+        ctx512.fillStyle = '#ffd700';
+        ctx512.fillText('전술 체스', 256, 400);
+        
+        // 다운로드 링크 생성
+        setTimeout(() => {
+            // 192x192 다운로드
+            canvas192.toBlob((blob) => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'icon-192.png';
+                document.body.appendChild(a);
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+            
+            // 512x512 다운로드
+            setTimeout(() => {
+                canvas512.toBlob((blob) => {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'icon-512.png';
+                    document.body.appendChild(a);
+                    a.click();
+                    URL.revokeObjectURL(url);
+                });
+            }, 1000);
+        }, 500);
+    </script>
+    
+    <p>이 페이지를 브라우저에서 열면 자동으로 아이콘 2개(icon-192.png, icon-512.png)가 다운로드됩니다.</p>
+    <p>다운로드된 파일을 tft-game-main 폴더에 넣어주세요.</p>
+</body>
+</html>

@@ -61,9 +61,46 @@ class BattleSystem {
     runBattle(playerTeam, enemyTeam, resolve) {
         let ticks = 0;
         const maxTicks = 60000 / this.updateInterval; // 60초 제한
+        const maxSeconds = 60;
         
         const battleLoop = setInterval(() => {
             ticks++;
+            
+            // 전투 타이머 업데이트 (1초마다)
+            if (ticks % 10 === 0) { // updateInterval이 100ms이므로 10틱 = 1초
+                const secondsElapsed = Math.floor(ticks / 10);
+                const secondsRemaining = maxSeconds - secondsElapsed;
+                
+                // UI 업데이트 (모달과 최소화 바 모두)
+                const battleTimerEl = document.getElementById('battleTimer');
+                const battleTimerMiniEl = document.getElementById('battleTimerMini');
+                
+                if (battleTimerEl) {
+                    battleTimerEl.textContent = Math.max(0, secondsRemaining);
+                    
+                    // 색상 변경
+                    if (secondsRemaining <= 10) {
+                        battleTimerEl.style.color = '#e74c3c'; // 빨간색
+                    } else if (secondsRemaining <= 20) {
+                        battleTimerEl.style.color = '#f39c12'; // 주황색
+                    } else {
+                        battleTimerEl.style.color = '#2ecc71'; // 초록색
+                    }
+                }
+                
+                if (battleTimerMiniEl) {
+                    battleTimerMiniEl.textContent = Math.max(0, secondsRemaining);
+                    
+                    // 색상 변경
+                    if (secondsRemaining <= 10) {
+                        battleTimerMiniEl.style.color = '#e74c3c'; // 빨간색
+                    } else if (secondsRemaining <= 20) {
+                        battleTimerMiniEl.style.color = '#f39c12'; // 주황색
+                    } else {
+                        battleTimerMiniEl.style.color = '#2ecc71'; // 초록색
+                    }
+                }
+            }
             
             // 승리 조건 체크 - 한 팀이 전멸했는지만 확인
             const playersAlive = playerTeam.filter(u => !u.isDead).length;

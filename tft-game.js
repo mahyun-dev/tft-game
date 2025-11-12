@@ -386,10 +386,8 @@ class TFTGame {
             return;
         }
         
-        // 다음 라운드
-        setTimeout(() => {
-            this.nextRound();
-        }, 3000);
+        // 다음 라운드는 UI에서 "계속" 버튼을 눌렀을 때 호출됨
+        // setTimeout 제거 - 전투가 완료될 때까지 기다림
     }
 
     // PVE 라운드 체크

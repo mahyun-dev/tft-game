@@ -1366,6 +1366,40 @@ body {
     }
 }
 
+/* 최소화된 전투 바 */
+.battle-minimized {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    background: var(--military-dark);
+    border: 2px solid var(--gold);
+    border-radius: 8px;
+    padding: 15px 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.7);
+    z-index: 999;
+    animation: slideInRight 0.3s ease;
+}
+
+.battle-mini-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    font-weight: bold;
+    color: var(--text-light);
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
 /* 작은 화면 공통 */
 @media screen and (max-width: 640px) {
     .header-left h1 {
@@ -1387,3 +1421,4 @@ body {
         align-items: stretch;
     }
 }
+
