@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>11사단 기갑수색대대 - 전술 체스</title>
+    <link rel="stylesheet" href="tft-style.css">
+</head>
+<body>
+    <div class="game-container">
+        <!-- 헤더 -->
+        <header class="game-header">
+            <div class="header-left">
+                <h1>🪖 11사단 기갑수색대대 전술 체스</h1>
+                <div class="round-info">
+                    <span id="stage">Stage 1</span> - 
+                    <span id="round">Round 1</span>
+                    <span id="roundType" style="margin-left: 10px; color: #ffd700;"></span>
+                </div>
+            </div>
+            <div class="header-center">
+                <div class="timer-display">
+                    <div id="timerLabel" class="timer-label">준비 시간</div>
+                    <div id="timerValue" class="timer-value">30</div>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="difficulty-selector">
+                    <label>난이도:</label>
+                    <select id="difficulty">
+                        <option value="easy">쉬움</option>
+                        <option value="normal" selected>보통</option>
+                        <option value="hard">어려움</option>
+                    </select>
+                </div>
+                <button id="newGameBtn" class="btn btn-primary">새 게임</button>
+            </div>
+        </header>
+
+        <!-- 메인 게임 영역 -->
+        <div class="game-main">
+            <!-- 왼쪽: 플레이어 정보 & 시너지 -->
+            <aside class="left-panel">
+                <div class="player-info card">
+                    <h3>플레이어 정보</h3>
+                    <div class="health-bar">
+                        <div class="health-fill" id="playerHealthBar" style="width: 100%"></div>
+                        <span id="playerHealth">100 HP</span>
+                    </div>
+                    <div class="stats">
+                        <div class="stat">
+                            <span class="label">💰 골드:</span>
+                            <span id="playerGold" class="value">0</span>
+                        </div>
+                        <div class="stat">
+                            <span class="label">⭐ 레벨:</span>
+                            <span id="playerLevel" class="value">1</span>
+                        </div>
+                        <div class="stat">
+                            <span class="label">🎖️ 경험치:</span>
+                            <span id="playerExp" class="value">0/2</span>
+                        </div>
+                    </div>
+                    <div class="streak">
+                        <span id="streakInfo">-</span>
+                    </div>
+                </div>
+
+                <div class="synergies card">
+                    <h3>활성 시너지</h3>
+                    <div id="synergyList" class="synergy-list">
+                        <p class="empty-message">시너지 없음</p>
+                    </div>
+                </div>
+
+                <div class="ai-info card">
+                    <h3>현재 대전 상대</h3>
+                    <div id="opponentName" style="font-weight: bold; margin-bottom: 8px; color: #3498db;">-</div>
+                    <div class="health-bar">
+                        <div class="health-fill ai" id="aiHealthBar" style="width: 100%"></div>
+                        <span id="aiHealth">100 HP</span>
+                    </div>
+                    <div class="stats">
+                        <div class="stat">
+                            <span class="label">⭐ 레벨:</span>
+                            <span id="aiLevel" class="value">1</span>
+                        </div>
+                        <div class="stat">
+                            <span class="label">👥 유닛:</span>
+                            <span id="aiUnits" class="value">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="player-list card">
+                    <h3>플레이어 순위 <span style="font-size: 12px; color: #95a5a6;">(클릭하여 필드 보기)</span></h3>
+                    <div id="playerListContainer" class="player-list-items">
+                        <!-- 플레이어 목록 -->
+                    </div>
+                </div>
+            </aside>
+
+            <!-- 중앙: 게임 보드 -->
+            <div class="center-panel">
+                <!-- 전투 필드 -->
+                <div class="battle-field card">
+                    <h3>
+                        <span id="currentViewPlayerName">내 필드</span>
+                        <span id="viewModeIndicator" style="font-size: 12px; color: #95a5a6; margin-left: 10px;"></span>
+                    </h3>
+                    <div id="battleGrid" class="grid">
+                        <!-- 4x7 그리드 -->
+                    </div>
+                </div>
+
+                <!-- 벤치 -->
+                <div class="bench card">
+                    <h3>벤치 (0/9)</h3>
+                    <div id="benchArea" class="bench-slots">
+                        <!-- 벤치 슬롯 -->
+                    </div>
+                </div>
+
+                <!-- 상점 -->
+                <div class="shop card">
+                    <div class="shop-header">
+                        <h3>상점</h3>
+                    </div>
+                    <div id="shopArea" class="shop-slots">
+                        <!-- 상점 슬롯 -->
+                    </div>
+                </div>
+
+                <!-- 액션 버튼 -->
+                <div class="action-buttons">
+                    <button id="buyExpBtn" class="btn btn-info">⭐ 경험치 구매 (4G)</button>
+                    <button id="rerollBtn" class="btn btn-warning">🔄 리롤 (2G)</button>
+                </div>
+            </div>
+
+            <!-- 오른쪽: 아이템 & 정보 -->
+            <aside class="right-panel">
+                <div class="items card">
+                    <h3>아이템 보관함</h3>
+                    <div id="itemStorage" class="item-grid">
+                        <p class="empty-message">아이템 없음</p>
+                    </div>
+                </div>
+
+                <div class="champion-info card">
+                    <h3>챔피언 정보</h3>
+                    <div id="championDetail" class="champion-detail">
+                        <p class="empty-message">챔피언을 선택하세요</p>
+                    </div>
+                </div>
+
+                <div class="game-log card">
+                    <h3>게임 로그</h3>
+                    <div id="gameLog" class="log-content">
+                        <p>게임을 시작하세요!</p>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- 모달: 게임 오버 -->
+    <div id="gameOverModal" class="modal">
+        <div class="modal-content">
+            <h2 id="gameOverTitle">게임 종료</h2>
+            <p id="gameOverMessage"></p>
+            <button id="restartBtn" class="btn btn-primary">다시 시작</button>
+        </div>
+    </div>
+
+    <!-- 모달: 전투 화면 -->
+    <div id="battleModal" class="modal">
+        <div class="modal-content battle-content">
+            <h2>전투 중...</h2>
+            <div id="battleAnimation" class="battle-animation">
+                <canvas id="battleCanvas" width="600" height="400"></canvas>
+            </div>
+            <div id="battleResult" class="battle-result" style="display: none;">
+                <h3 id="battleResultTitle"></h3>
+                <p id="battleResultMessage"></p>
+                <button id="continueBattleBtn" class="btn btn-primary">계속</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 챔피언 툴팁 -->
+    <div id="championTooltip" class="champion-tooltip" style="display: none;">
+        <div class="tooltip-header">
+            <span id="tooltipName" class="tooltip-name"></span>
+            <span id="tooltipCost" class="tooltip-cost"></span>
+        </div>
+        <div class="tooltip-traits" id="tooltipTraits"></div>
+        <div class="tooltip-stats" id="tooltipStats"></div>
+        <div class="tooltip-skill" id="tooltipSkill"></div>
+        <div class="tooltip-items" id="tooltipItems"></div>
+    </div>
+
+    <!-- 모달: 상대 필드 보기 -->
+    <div id="scoutModal" class="modal">
+        <div class="modal-content scout-content">
+            <div class="scout-header">
+                <h2>🔍 상대 필드 정보</h2>
+                <button id="closeScoutBtn" class="btn btn-close">✖</button>
+            </div>
+            <div class="scout-player-select">
+                <label>플레이어 선택:</label>
+                <select id="scoutPlayerSelect">
+                    <!-- 옵션 동적 생성 -->
+                </select>
+            </div>
+            <div id="scoutContent" class="scout-content-area">
+                <div class="scout-info">
+                    <div class="scout-player-info">
+                        <h3 id="scoutPlayerName">-</h3>
+                        <div class="scout-stats">
+                            <span>❤️ 체력: <span id="scoutHealth">-</span></span>
+                            <span>⭐ 레벨: <span id="scoutLevel">-</span></span>
+                            <span>👥 유닛: <span id="scoutUnitCount">-</span></span>
+                        </div>
+                    </div>
+                    <div class="scout-synergies">
+                        <h4>활성 시너지</h4>
+                        <div id="scoutSynergyList"></div>
+                    </div>
+                </div>
+                <div class="scout-field">
+                    <h4>전투 필드</h4>
+                    <div id="scoutGrid" class="grid scout-grid">
+                        <!-- 4x7 그리드 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 자바스크립트 파일들 -->
+    <script src="tft-champions.js"></script>
+    <script src="tft-synergies.js"></script>
+    <script src="tft-items.js"></script>
+    <script src="tft-battle.js"></script>
+    <script src="tft-ai.js"></script>
+    <script src="tft-game.js"></script>
+    <script src="tft-ui.js"></script>
+</body>
+</html>
