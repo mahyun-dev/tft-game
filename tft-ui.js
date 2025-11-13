@@ -7,6 +7,25 @@ let draggedUnit = null;
 let currentViewPlayerId = 0; // 0 = 플레이어, 1-7 = AI
 let isViewingOtherPlayer = false;
 
+// 스킬 캐스팅 이펙트 관리
+let skillCastEffects = [];
+
+// 스킬 캐스팅 시각 효과 표시 (전역 함수)
+window.showSkillCastEffect = function(unit) {
+    // 스킬 캐스팅 이펙트 데이터 추가
+    skillCastEffects.push({
+        unitName: unit.name,
+        skillName: unit.skill.name,
+        x: unit.x,
+        y: unit.y,
+        timestamp: Date.now(),
+        duration: 1500 // 1.5초간 표시
+    });
+    
+    // 콘솔 로그 (디버깅용)
+    console.log(`💥 ${unit.name}이(가) [${unit.skill.name}] 스킬 시전!`);
+};
+
 // DOM 로드 완료 후 초기화
 document.addEventListener('DOMContentLoaded', () => {
     initializeGame();
@@ -882,16 +901,31 @@ function animateBattle() {
             }
         }
         
+        // 스킬 캐스팅 효과 (빛나는 효과)
+        if (unit.isCastingSkill) {
+            const pulseIntensity = Math.sin(Date.now() * 0.01) * 0.5 + 0.5;
+            ctx.shadowBlur = 20 * pulseIntensity;
+            ctx.shadowColor = '#ffd700';
+        }
+        
         // 유닛 원
         ctx.fillStyle = unit.color;
         ctx.beginPath();
         ctx.arc(unit.x + offsetX, unit.y, unit.size, 0, Math.PI * 2);
         ctx.fill();
         
-        // 테두리 (티어별)
-        ctx.strokeStyle = getTierColor(unit.tier);
-        ctx.lineWidth = 3;
+        // 테두리 (티어별 또는 스킬 캐스팅 시 금색)
+        if (unit.isCastingSkill) {
+            ctx.strokeStyle = '#ffd700';
+            ctx.lineWidth = 5;
+        } else {
+            ctx.strokeStyle = getTierColor(unit.tier);
+            ctx.lineWidth = 3;
+        }
         ctx.stroke();
+        
+        // 그림자 효과 제거
+        ctx.shadowBlur = 0;
         
         // 체력바
         const hpPercent = unit.currentHp / unit.maxHp;
@@ -935,6 +969,39 @@ function animateBattle() {
     
     // 전투 이펙트
     function drawBattleEffects() {
+        // 스킬 캐스팅 이펙트 표시
+        const now = Date.now();
+        skillCastEffects = skillCastEffects.filter(effect => {
+            const elapsed = now - effect.timestamp;
+            if (elapsed > effect.duration) return false; // 만료된 효과 제거
+            
+            // 페이드 아웃 효과
+            const opacity = 1 - (elapsed / effect.duration);
+            
+            // 스킬 이름 표시 (화면 상단)
+            ctx.save();
+            ctx.globalAlpha = opacity;
+            ctx.fillStyle = '#ffd700';
+            ctx.font = 'bold 20px Arial';
+            ctx.textAlign = 'center';
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 3;
+            ctx.strokeText(`💥 ${effect.skillName}`, canvas.width / 2, 60);
+            ctx.fillText(`💥 ${effect.skillName}`, canvas.width / 2, 60);
+            
+            // 원형 파동 효과
+            const radius = (elapsed / effect.duration) * 100;
+            ctx.strokeStyle = `rgba(255, 215, 0, ${opacity * 0.5})`;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2, canvas.height / 2, radius, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            ctx.restore();
+            
+            return true; // 계속 표시
+        });
+        
         // 랜덤 공격 효과
         if (frame % 30 === 0 && battleUnits.player.length > 0 && battleUnits.enemy.length > 0) {
             const attacker = battleUnits.player[Math.floor(Math.random() * battleUnits.player.length)];

@@ -381,6 +381,9 @@ class BattleSystem {
         
         const target = unit.target;
         
+        // 스킬 캐스팅 시각 효과 표시
+        this.showSkillVisualFeedback(unit);
+        
         // 스킬 피해 보너스 적용
         const originalDamage = unit.stats.attackDamage;
         if (unit.skillDamageBonus) {
@@ -419,6 +422,22 @@ class BattleSystem {
         if (unit.items) {
             processItemEffects(unit, 'onSkill', { target, allies, enemies });
         }
+    }
+    
+    // 스킬 시각 효과 표시
+    showSkillVisualFeedback(unit) {
+        // 스킬 캐스팅 이벤트 발생 - UI에서 처리
+        if (typeof window !== 'undefined' && window.showSkillCastEffect) {
+            window.showSkillCastEffect(unit);
+        }
+        
+        // 유닛에 스킬 캐스팅 플래그 설정 (애니메이션용)
+        unit.isCastingSkill = true;
+        unit.skillCastTime = Date.now();
+        
+        setTimeout(() => {
+            unit.isCastingSkill = false;
+        }, 500); // 0.5초 동안 캐스팅 상태 유지
     }
 
     // 사망 처리
