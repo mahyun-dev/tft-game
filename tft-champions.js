@@ -22,7 +22,7 @@ const CHAMPIONS = [
         },
         skill: {
             name: '제식훈련',
-            description: '기본 공격력 50% 증가',
+            description: '기본 공격력 50% 증가 (4초)',
             manaCost: 50,
             effect: (unit, target, allies, enemies) => {
                 unit.buffAttackDamage = unit.stats.attackDamage * 0.5;
@@ -67,7 +67,7 @@ const CHAMPIONS = [
         stats: {
             hp: 600,
             mana: 0,
-            maxMana: 80,
+            maxMana: 70,
             attackDamage: 35,
             armor: 30,
             magicResist: 20,
@@ -78,7 +78,7 @@ const CHAMPIONS = [
         skill: {
             name: '응급수리',
             description: '가장 가까운 아군 체력 200 회복',
-            manaCost: 80,
+            manaCost: 70,
             effect: (unit, target, allies, enemies) => {
                 const nearestAlly = allies.filter(a => a.id !== unit.id).sort((a, b) => 
                     Math.hypot(a.x - unit.x, a.y - unit.y) - Math.hypot(b.x - unit.x, b.y - unit.y)
@@ -98,7 +98,7 @@ const CHAMPIONS = [
         stats: {
             hp: 520,
             mana: 0,
-            maxMana: 70,
+            maxMana: 65,
             attackDamage: 38,
             armor: 22,
             magicResist: 25,
@@ -108,8 +108,8 @@ const CHAMPIONS = [
         },
         skill: {
             name: '통신망 구축',
-            description: '아군 전체 공격속도 20% 증가',
-            manaCost: 70,
+            description: '아군 전체 공격속도 20% 증가 (4초)',
+            manaCost: 65,
             effect: (unit, target, allies, enemies) => {
                 allies.forEach(ally => {
                     const original = ally.stats.attackSpeed;
@@ -128,7 +128,7 @@ const CHAMPIONS = [
         stats: {
             hp: 580,
             mana: 0,
-            maxMana: 75,
+            maxMana: 70,
             attackDamage: 30,
             armor: 25,
             magicResist: 30,
@@ -139,7 +139,7 @@ const CHAMPIONS = [
         skill: {
             name: '응급처치',
             description: '체력이 가장 낮은 아군 체력 250 회복',
-            manaCost: 75,
+            manaCost: 70,
             effect: (unit, target, allies, enemies) => {
                 const lowestHpAlly = allies.sort((a, b) => 
                     (a.currentHp / a.stats.hp) - (b.currentHp / b.stats.hp)
@@ -161,7 +161,7 @@ const CHAMPIONS = [
         stats: {
             hp: 700,
             mana: 0,
-            maxMana: 60,
+            maxMana: 80,
             attackDamage: 65,
             armor: 30,
             magicResist: 25,
@@ -172,7 +172,7 @@ const CHAMPIONS = [
         skill: {
             name: 'M60 난사',
             description: '전방 3칸의 모든 적에게 150% 피해',
-            manaCost: 60,
+            manaCost: 80,
             effect: (unit, target, allies, enemies) => {
                 enemies.forEach(enemy => {
                     const distance = Math.hypot(enemy.x - unit.x, enemy.y - unit.y);
@@ -192,7 +192,7 @@ const CHAMPIONS = [
         stats: {
             hp: 850,
             mana: 0,
-            maxMana: 70,
+            maxMana: 100,
             attackDamage: 60,
             armor: 45,
             magicResist: 30,
@@ -203,7 +203,7 @@ const CHAMPIONS = [
         skill: {
             name: '장갑차 돌격',
             description: '돌진하여 200 피해 + 1초 기절',
-            manaCost: 70,
+            manaCost: 100,
             effect: (unit, target, allies, enemies) => {
                 if (target) {
                     target.currentHp -= 200;
@@ -222,7 +222,7 @@ const CHAMPIONS = [
         stats: {
             hp: 650,
             mana: 0,
-            maxMana: 80,
+            maxMana: 90,
             attackDamage: 120,
             armor: 25,
             magicResist: 25,
@@ -233,7 +233,7 @@ const CHAMPIONS = [
         skill: {
             name: '직사포격',
             description: '단일 대상에게 300% 피해',
-            manaCost: 80,
+            manaCost: 90,
             effect: (unit, target, allies, enemies) => {
                 if (target) {
                     target.currentHp -= unit.stats.attackDamage * 3;
@@ -250,7 +250,7 @@ const CHAMPIONS = [
         stats: {
             hp: 620,
             mana: 0,
-            maxMana: 65,
+            maxMana: 75,
             attackDamage: 50,
             armor: 28,
             magicResist: 28,
@@ -261,7 +261,7 @@ const CHAMPIONS = [
         skill: {
             name: '표적지시',
             description: '아군 전체 명중률 30% 증가, 5초간',
-            manaCost: 65,
+            manaCost: 75,
             effect: (unit, target, allies, enemies) => {
                 allies.forEach(ally => {
                     ally.accuracy = (ally.accuracy || 1) * 1.3;
@@ -310,7 +310,7 @@ const CHAMPIONS = [
         stats: {
             hp: 750,
             mana: 0,
-            maxMana: 70,
+            maxMana: 85,
             attackDamage: 70,
             armor: 35,
             magicResist: 30,
@@ -320,8 +320,8 @@ const CHAMPIONS = [
         },
         skill: {
             name: '돌격명령',
-            description: '경수색반 유닛 공격속도 50% 증가',
-            manaCost: 70,
+            description: '경수색반 유닛 공격속도 50% 증가 (5초)',
+            manaCost: 85,
             effect: (unit, target, allies, enemies) => {
                 allies.filter(a => a.traits.includes('경수색반')).forEach(ally => {
                     const original = ally.stats.attackSpeed;
@@ -340,7 +340,7 @@ const CHAMPIONS = [
         stats: {
             hp: 700,
             mana: 0,
-            maxMana: 75,
+            maxMana: 85,
             attackDamage: 80,
             armor: 32,
             magicResist: 28,
@@ -350,8 +350,8 @@ const CHAMPIONS = [
         },
         skill: {
             name: '화력집중',
-            description: '지원반 유닛 공격력 40% 증가',
-            manaCost: 75,
+            description: '지원반 유닛 공격력 40% 증가 (5초)',
+            manaCost: 85,
             effect: (unit, target, allies, enemies) => {
                 allies.filter(a => a.traits.includes('지원반')).forEach(ally => {
                     ally.buffAttackDamage = (ally.buffAttackDamage || 0) + ally.stats.attackDamage * 0.4;
@@ -373,7 +373,7 @@ const CHAMPIONS = [
         stats: {
             hp: 900,
             mana: 0,
-            maxMana: 80,
+            maxMana: 90,
             attackDamage: 95,
             armor: 40,
             magicResist: 35,
@@ -383,8 +383,8 @@ const CHAMPIONS = [
         },
         skill: {
             name: '화력유도',
-            description: '전방 지역에 200 광역 피해 + 아군 공격력 30% 증가',
-            manaCost: 80,
+            description: '전방 지역에 200 광역 피해 + 아군 공격력 30% 증가 (4초)',
+            manaCost: 90,
             effect: (unit, target, allies, enemies) => {
                 // 광역 피해
                 enemies.forEach(enemy => {
@@ -412,7 +412,7 @@ const CHAMPIONS = [
         stats: {
             hp: 950,
             mana: 0,
-            maxMana: 85,
+            maxMana: 100,
             attackDamage: 110,
             armor: 45,
             magicResist: 35,
@@ -423,7 +423,7 @@ const CHAMPIONS = [
         skill: {
             name: '제압사격',
             description: '3x3 범위에 80 피해/초, 3초간',
-            manaCost: 85,
+            manaCost: 100,
             effect: (unit, target, allies, enemies) => {
                 let ticks = 0;
                 const interval = setInterval(() => {
@@ -448,7 +448,7 @@ const CHAMPIONS = [
         stats: {
             hp: 800,
             mana: 0,
-            maxMana: 90,
+            maxMana: 100,
             attackDamage: 150,
             armor: 35,
             magicResist: 30,
@@ -459,7 +459,7 @@ const CHAMPIONS = [
         skill: {
             name: '대전차 미사일',
             description: '단일 대상 500 피해 (기갑에 2배)',
-            manaCost: 90,
+            manaCost: 100,
             effect: (unit, target, allies, enemies) => {
                 if (target) {
                     let damage = 500;
@@ -478,7 +478,7 @@ const CHAMPIONS = [
         stats: {
             hp: 1100,
             mana: 0,
-            maxMana: 75,
+            maxMana: 90,
             attackDamage: 85,
             armor: 55,
             magicResist: 40,
@@ -488,8 +488,8 @@ const CHAMPIONS = [
         },
         skill: {
             name: '기갑돌격 지시',
-            description: '기보 유닛 방어력 +50, 공격력 +30%',
-            manaCost: 75,
+            description: '기보 유닛 방어력 +50, 공격력 +30% (6초)',
+            manaCost: 90,
             effect: (unit, target, allies, enemies) => {
                 allies.filter(a => a.traits.includes('기보')).forEach(ally => {
                     ally.stats.armor += 50;
@@ -511,7 +511,7 @@ const CHAMPIONS = [
         stats: {
             hp: 950,
             mana: 0,
-            maxMana: 70,
+            maxMana: 85,
             attackDamage: 90,
             armor: 42,
             magicResist: 38,
@@ -521,8 +521,8 @@ const CHAMPIONS = [
         },
         skill: {
             name: '작전지시',
-            description: '경수색반 모든 스탯 25% 증가',
-            manaCost: 70,
+            description: '경수색반 모든 스탯 25% 증가 (6초)',
+            manaCost: 85,
             effect: (unit, target, allies, enemies) => {
                 allies.filter(a => a.traits.includes('경수색반')).forEach(ally => {
                     const buffs = {
@@ -551,7 +551,7 @@ const CHAMPIONS = [
         stats: {
             hp: 1000,
             mana: 0,
-            maxMana: 100,
+            maxMana: 110,
             attackDamage: 70,
             armor: 50,
             magicResist: 40,
@@ -562,7 +562,7 @@ const CHAMPIONS = [
         skill: {
             name: 'C4 폭파',
             description: '2x2 범위 400 피해 + 아군에게 방어막 200',
-            manaCost: 100,
+            manaCost: 110,
             effect: (unit, target, allies, enemies) => {
                 enemies.forEach(enemy => {
                     const distance = Math.hypot(enemy.x - unit.x, enemy.y - unit.y);
@@ -587,7 +587,7 @@ const CHAMPIONS = [
         stats: {
             hp: 1400,
             mana: 0,
-            maxMana: 100,
+            maxMana: 120,
             attackDamage: 180,
             armor: 80,
             magicResist: 50,
@@ -598,7 +598,7 @@ const CHAMPIONS = [
         skill: {
             name: '105mm 주포 사격',
             description: '직선상 모든 적에게 600 피해',
-            manaCost: 100,
+            manaCost: 120,
             effect: (unit, target, allies, enemies) => {
                 enemies.forEach(enemy => {
                     // 직선 판정 (각도 계산)
@@ -620,7 +620,7 @@ const CHAMPIONS = [
         stats: {
             hp: 1600,
             mana: 0,
-            maxMana: 80,
+            maxMana: 110,
             attackDamage: 100,
             armor: 100,
             magicResist: 60,
@@ -631,7 +631,7 @@ const CHAMPIONS = [
         skill: {
             name: '전차 돌격',
             description: '돌진하여 경로상 모든 적 300 피해 + 2초 기절',
-            manaCost: 80,
+            manaCost: 110,
             effect: (unit, target, allies, enemies) => {
                 enemies.forEach(enemy => {
                     const distance = Math.hypot(enemy.x - unit.x, enemy.y - unit.y);
@@ -653,7 +653,7 @@ const CHAMPIONS = [
         stats: {
             hp: 1200,
             mana: 0,
-            maxMana: 90,
+            maxMana: 100,
             attackDamage: 100,
             armor: 60,
             magicResist: 60,
@@ -663,8 +663,8 @@ const CHAMPIONS = [
         },
         skill: {
             name: '전술지휘',
-            description: '아군 전체 공격력 +40%, 공격속도 +30%',
-            manaCost: 90,
+            description: '아군 전체 공격력 +40%, 공격속도 +30% (7초)',
+            manaCost: 100,
             effect: (unit, target, allies, enemies) => {
                 allies.forEach(ally => {
                     const buffs = {
@@ -690,7 +690,7 @@ const CHAMPIONS = [
         stats: {
             hp: 1300,
             mana: 0,
-            maxMana: 100,
+            maxMana: 110,
             attackDamage: 110,
             armor: 65,
             magicResist: 65,
@@ -700,8 +700,8 @@ const CHAMPIONS = [
         },
         skill: {
             name: '중대 작전명령',
-            description: '아군 전체 모든 스탯 35% 증가 + 300 보호막',
-            manaCost: 100,
+            description: '아군 전체 모든 스탯 35% 증가 + 300 보호막 (8초)',
+            manaCost: 110,
             effect: (unit, target, allies, enemies) => {
                 allies.forEach(ally => {
                     const buffs = {
@@ -734,7 +734,7 @@ const CHAMPIONS = [
         stats: {
             hp: 850,
             mana: 0,
-            maxMana: 120,
+            maxMana: 130,
             attackDamage: 250,
             armor: 30,
             magicResist: 30,
@@ -745,7 +745,7 @@ const CHAMPIONS = [
         skill: {
             name: '정밀사격',
             description: '가장 먼 적에게 1000 피해',
-            manaCost: 120,
+            manaCost: 130,
             effect: (unit, target, allies, enemies) => {
                 const farthest = enemies.sort((a, b) => 
                     Math.hypot(b.x - unit.x, b.y - unit.y) - Math.hypot(a.x - unit.x, a.y - unit.y)
@@ -767,7 +767,7 @@ const CHAMPIONS = [
         stats: {
             hp: 1800,
             mana: 0,
-            maxMana: 120,
+            maxMana: 130,
             attackDamage: 150,
             armor: 80,
             magicResist: 80,
@@ -777,8 +777,8 @@ const CHAMPIONS = [
         },
         skill: {
             name: '대대 총공세',
-            description: '아군 전체 공격력 +60%, 방어력 +50, 공격속도 +50%',
-            manaCost: 120,
+            description: '아군 전체 공격력 +60%, 방어력 +50, 공격속도 +50% (10초)',
+            manaCost: 130,
             effect: (unit, target, allies, enemies) => {
                 allies.forEach(ally => {
                     const buffs = {
@@ -806,7 +806,7 @@ const CHAMPIONS = [
         stats: {
             hp: 1400,
             mana: 0,
-            maxMana: 100,
+            maxMana: 110,
             attackDamage: 200,
             armor: 60,
             magicResist: 60,
@@ -817,7 +817,7 @@ const CHAMPIONS = [
         skill: {
             name: '특수작전 개시',
             description: '적 후방으로 순간이동 + 가장 약한 적 즉사',
-            manaCost: 100,
+            manaCost: 110,
             effect: (unit, target, allies, enemies) => {
                 const weakest = enemies.sort((a, b) => a.currentHp - b.currentHp)[0];
                 if (weakest && weakest.currentHp < 500) {
@@ -842,7 +842,7 @@ const CHAMPIONS = [
         stats: {
             hp: 2000,
             mana: 0,
-            maxMana: 110,
+            maxMana: 120,
             attackDamage: 140,
             armor: 90,
             magicResist: 70,
@@ -853,7 +853,7 @@ const CHAMPIONS = [
         skill: {
             name: '불굴의 의지',
             description: '아군 전체 최대 체력 +30%, 5초간 무적',
-            manaCost: 110,
+            manaCost: 120,
             effect: (unit, target, allies, enemies) => {
                 allies.forEach(ally => {
                     ally.stats.hp *= 1.3;
@@ -875,7 +875,7 @@ const CHAMPIONS = [
         stats: {
             hp: 2200,
             mana: 0,
-            maxMana: 130,
+            maxMana: 140,
             attackDamage: 250,
             armor: 120,
             magicResist: 80,
@@ -886,7 +886,7 @@ const CHAMPIONS = [
         skill: {
             name: '120mm 스마트포탄',
             description: '전체 적에게 400 피해 + 4초 화상',
-            manaCost: 130,
+            manaCost: 140,
             effect: (unit, target, allies, enemies) => {
                 enemies.forEach(enemy => {
                     enemy.currentHp -= 400;
@@ -910,7 +910,7 @@ const CHAMPIONS = [
         stats: {
             hp: 1500,
             mana: 0,
-            maxMana: 140,
+            maxMana: 150,
             attackDamage: 180,
             armor: 70,
             magicResist: 70,
@@ -920,8 +920,8 @@ const CHAMPIONS = [
         },
         skill: {
             name: '화력집중포격',
-            description: '전장 전체에 500 피해 + 적 방어력 50% 감소',
-            manaCost: 140,
+            description: '전장 전체에 500 피해 + 적 방어력 50% 감소 (6초)',
+            manaCost: 150,
             effect: (unit, target, allies, enemies) => {
                 enemies.forEach(enemy => {
                     enemy.currentHp -= 500;
