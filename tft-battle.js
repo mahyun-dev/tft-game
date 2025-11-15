@@ -51,6 +51,31 @@ class BattleSystem {
                 shield: 0
             };
             
+            // 아이템 효과 적용
+            if (battleUnit.items && battleUnit.items.length > 0) {
+                battleUnit.items.forEach(item => {
+                    if (item.stats) {
+                        Object.keys(item.stats).forEach(stat => {
+                            if (stat.includes('Multiplier')) {
+                                const baseStat = stat.replace('Multiplier', '');
+                                battleUnit.stats[baseStat] *= (1 + item.stats[stat]);
+                            } else if (['critChance', 'evasion', 'lifesteal', 'damageReduction', 'thornsDamage'].includes(stat)) {
+                                battleUnit[stat] = (battleUnit[stat] || 0) + item.stats[stat];
+                            } else if (stat === 'hp') {
+                                battleUnit.stats.hp += item.stats[stat];
+                                battleUnit.currentHp += item.stats[stat];
+                            } else {
+                                battleUnit.stats[stat] = (battleUnit.stats[stat] || 0) + item.stats[stat];
+                            }
+                        });
+                    }
+                    // 특수 효과
+                    if (item.special) {
+                        battleUnit[item.special] = true;
+                    }
+                });
+            }
+            
             team.push(battleUnit);
         });
         

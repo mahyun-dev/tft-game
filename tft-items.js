@@ -588,3 +588,70 @@ function processItemEffects(unit, eventType, data = {}) {
     
     return false;
 }
+
+// 아이템 조합 함수
+function combineItems(item1, item2) {
+    if (!item1 || !item2) return null;
+    
+    // 기본 아이템만 조합 가능
+    if (!(item1.id in BASE_ITEMS) || !(item2.id in BASE_ITEMS)) return null;
+    
+    const key1 = item1.id;
+    const key2 = item2.id;
+    const combinedKey = key1 < key2 ? `${key1}+${key2}` : `${key2}+${key1}`;
+    
+    // 미리 정의된 조합 아이템이 있으면 반환
+    if (COMBINED_ITEMS[combinedKey] || COMBINED_ITEMS[key1 + '+' + key2] || COMBINED_ITEMS[key2 + '+' + key1]) {
+        return COMBINED_ITEMS[combinedKey] || COMBINED_ITEMS[key1 + '+' + key2] || COMBINED_ITEMS[key2 + '+' + key1];
+    }
+    
+    // 같은 아이템이면 조합 불가
+    if (key1 === key2) return null;
+    
+    // 다른 아이템이면 기본 조합 생성
+    const combinedStats = {};
+    if (item1.stats) {
+        Object.assign(combinedStats, item1.stats);
+    }
+    if (item2.stats) {
+        Object.keys(item2.stats).forEach(stat => {
+            if (combinedStats[stat]) {
+                combinedStats[stat] += item2.stats[stat];
+            } else {
+                combinedStats[stat] = item2.stats[stat];
+            }
+        });
+    }
+    
+    return {
+        id: `combined_${key1}_${key2}`,
+        name: `${item1.name} + ${item2.name}`,
+        description: `${item1.description}, ${item2.description}`,
+        icon: '🔧',
+        stats: combinedStats
+    };
+}
+
+// 유닛의 아이템 효과를 적용한 스탯 계산
+function calculateUnitStatsWithItems(unit) {
+    const stats = { ...unit.stats };
+    
+    if (unit.items && unit.items.length > 0) {
+        unit.items.forEach(item => {
+            if (item.stats) {
+                Object.keys(item.stats).forEach(stat => {
+                    if (stat.includes('Multiplier')) {
+                        const baseStat = stat.replace('Multiplier', '');
+                        stats[baseStat] *= (1 + item.stats[stat]);
+                    } else if (stat === 'hp') {
+                        stats.hp += item.stats[stat];
+                    } else {
+                        stats[stat] = (stats[stat] || 0) + item.stats[stat];
+                    }
+                });
+            }
+        });
+    }
+    
+    return stats;
+}

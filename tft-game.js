@@ -104,6 +104,13 @@ class TFTGame {
         this.stage = 1;
         this.player.gold = 4;
         
+        // 테스트용: 시작 시 랜덤 아이템 4개 지급
+        const baseItemKeys = Object.keys(BASE_ITEMS);
+        for (let i = 0; i < 10; i++) {
+            const randomKey = baseItemKeys[Math.floor(Math.random() * baseItemKeys.length)];
+            this.player.items.push(BASE_ITEMS[randomKey]);
+        }
+        
         // 모든 AI에게 초기 골드 지급
         this.aiPlayers.forEach(ai => {
             ai.gold = 4;
@@ -607,6 +614,31 @@ class TFTGame {
         return true;
     }
 
+    // 유닛 이동 (필드 -> 필드)
+    moveUnit(unit, newPosition) {
+        // 유닛이 필드에 있는지 확인
+        if (!unit.position) return false;
+        
+        // 새 위치 유효성 확인
+        if (newPosition.x < 0 || newPosition.x >= 7 || newPosition.y < 0 || newPosition.y >= 4) return false;
+        
+        // 이미 유닛이 있는지 확인
+        const existingUnit = this.player.units.find(u => 
+            u.position.x === newPosition.x && u.position.y === newPosition.y
+        );
+        
+        if (existingUnit) {
+            // 위치 교환
+            existingUnit.position = unit.position;
+            unit.position = newPosition;
+        } else {
+            // 그냥 이동
+            unit.position = newPosition;
+        }
+        
+        return true;
+    }
+
     // 레벨업
     levelUp() {
         if (this.player.level >= 9) return false;
@@ -743,7 +775,14 @@ class TFTGame {
 
     // 아이템 장착
     equipItem(unit, item) {
-        return applyItemToUnit(unit, item);
+        const index = this.player.items.indexOf(item);
+        if (index < 0) return false;
+        
+        if (applyItemToUnit(unit, item)) {
+            this.player.items.splice(index, 1);
+            return true;
+        }
+        return false;
     }
 
     // 게임 오버

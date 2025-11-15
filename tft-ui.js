@@ -7,6 +7,17 @@ let draggedUnit = null;
 let currentViewPlayerId = 0; // 0 = 플레이어, 1-7 = AI
 let isViewingOtherPlayer = false;
 
+// 유닛 정보 표시
+function showUnitInfo(unit) {
+    document.getElementById('unitInfoName').textContent = unit.name;
+    document.getElementById('unitInfoTier').textContent = unit.tier;
+    document.getElementById('unitInfoCost').textContent = unit.cost;
+    document.getElementById('unitInfoHp').textContent = unit.stats.hp;
+    document.getElementById('unitInfoAttack').textContent = unit.stats.attack;
+    document.getElementById('unitInfoItems').textContent = unit.items.map(i => i.name).join(', ') || '없음';
+    document.getElementById('unitInfoModal').classList.add('active');
+}
+
 // DOM 로드 완료 후 초기화
 document.addEventListener('DOMContentLoaded', () => {
     initializeGame();
@@ -28,7 +39,6 @@ function initializeGame() {
     currentGame.onTimerUpdate = updateTimer;
     currentGame.onBattleStart = startBattleSequence;
     currentGame.onUpgrade = (name, stars) => {
-        addLog(`✨ ${name}이(가) ${stars}성으로 업그레이드!`);
     };
     
     // 전투 결과 처리 콜백 설정
@@ -36,8 +46,6 @@ function initializeGame() {
     
     // 초기 UI 업데이트
     updateUI();
-    addLog('게임이 시작되었습니다!');
-    addLog(`난이도: ${difficulty === 'easy' ? '쉬움' : difficulty === 'normal' ? '보통' : '어려움'}`);
 }
 
 // 타이머 업데이트
@@ -78,20 +86,14 @@ function setupEventListeners() {
     // 경험치 구매
     document.getElementById('buyExpBtn').addEventListener('click', () => {
         if (currentGame.buyExp()) {
-            addLog('경험치 구매! (4G)');
             updateUI();
-        } else {
-            addLog('골드가 부족합니다!');
         }
     });
     
     // 리롤
     document.getElementById('rerollBtn').addEventListener('click', () => {
         if (currentGame.rerollShop()) {
-            addLog('상점 리롤! (2G)');
             updateUI();
-        } else {
-            addLog('골드가 부족합니다!');
         }
     });
     
@@ -108,6 +110,11 @@ function setupEventListeners() {
         
         // UI 업데이트
         updateUI();
+    });
+    
+    // 유닛 정보 모달 닫기
+    document.getElementById('unitInfoClose').addEventListener('click', () => {
+        document.getElementById('unitInfoModal').classList.remove('active');
     });
     
     document.getElementById('restartBtn').addEventListener('click', () => {
@@ -243,7 +250,12 @@ function updatePlayerList(allPlayers) {
         
         const nameSpan = document.createElement('span');
         nameSpan.className = 'player-item-name';
-        nameSpan.textContent = player.name + (player.isPlayer ? ' (나)' : '');
+        if (player.isPlayer && window.innerWidth < 768) {
+            nameSpan.textContent = '나';
+        } else {
+            const fullName = player.name + (player.isPlayer ? ' (나)' : '');
+            nameSpan.textContent = fullName.length > 6 ? fullName.substr(0, 6) + '...' : fullName;
+        }
         
         const statsDiv = document.createElement('div');
         statsDiv.className = 'player-item-stats';
@@ -424,7 +436,6 @@ function updateBench(bench) {
                 
                 if (draggedUnit && !draggedUnit.fromBench) {
                     // 필드에서 벤치로 드롭 (이미 removeUnit 호출됨)
-                    addLog(`${draggedUnit.unit.name}을(를) 벤치로 이동`);
                     updateUI();
                 }
             });
@@ -438,6 +449,24 @@ function updateBench(bench) {
 function updateShop(shop) {
     const shopArea = document.getElementById('shopArea');
     shopArea.innerHTML = '';
+    
+    // 상점 드롭 이벤트 (유닛 판매)
+    shopArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+    });
+    
+    shopArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const unitId = e.dataTransfer.getData('unitId');
+        if (unitId) {
+            const unit = currentGame.player.units.find(u => u.id === unitId) || currentGame.player.bench.find(u => u.id === unitId);
+            if (unit) {
+                const fromBench = currentGame.player.bench.includes(unit);
+                currentGame.sellChampion(unit, fromBench);
+                updateUI();
+            }
+        }
+    });
     
     shop.forEach((champion, index) => {
         const slot = document.createElement('div');
@@ -457,10 +486,7 @@ function updateShop(shop) {
             
             slot.addEventListener('click', () => {
                 if (currentGame.buyChampion(index)) {
-                    addLog(`${champion.name} 구매! (-${champion.cost}G)`);
                     updateUI();
-                } else {
-                    addLog('구매 실패! (골드 부족 또는 벤치 가득 참)');
                 }
             });
         } else {
@@ -489,8 +515,116 @@ function createUnitElement(unit, fromBench) {
         <div class="unit-stars">${stars}</div>
     `;
     
+    // 데이터 속성 추가
+    unitEl.dataset.from = fromBench ? 'bench' : 'field';
+    unitEl.dataset.index = fromBench ? currentGame.player.bench.indexOf(unit) : currentGame.player.units.indexOf(unit);
+    unitEl.dataset.dragged = 'false';
+    
     // 내 필드일 때만 드래그 앤 드롭 활성화
     if (!isViewingOtherPlayer) {
+        unitEl.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('unitId', unit.id);
+        });
+        
+        // 모바일 터치 드래그 앤 드롭
+        let isDragging = false;
+        let startX, startY;
+        let cloneEl;
+        
+        unitEl.addEventListener('touchstart', (e) => {
+            isDragging = false;
+            const touch = e.touches[0];
+            startX = touch.clientX;
+            startY = touch.clientY;
+            
+            // 드래그 판정
+            setTimeout(() => {
+                if (Math.abs(e.touches[0].clientX - startX) > 10 || Math.abs(e.touches[0].clientY - startY) > 10) {
+                    isDragging = true;
+                    
+                    // 클론 생성 - 작게 표시
+                    cloneEl = unitEl.cloneNode(true);
+                    cloneEl.style.position = 'fixed';
+                    cloneEl.style.zIndex = '1000';
+                    cloneEl.style.width = unitEl.offsetWidth + 'px';
+                    cloneEl.style.height = unitEl.offsetHeight + 'px';
+                    cloneEl.style.left = unitEl.getBoundingClientRect().left + 'px';
+                    cloneEl.style.top = unitEl.getBoundingClientRect().top + 'px';
+                    cloneEl.style.opacity = '0.8';
+                    cloneEl.style.pointerEvents = 'none';
+                    document.body.appendChild(cloneEl);
+                }
+            }, 200);
+            
+            e.preventDefault();
+        });
+        
+        unitEl.addEventListener('touchmove', (e) => {
+            if (!isDragging) return;
+            // 이동 시 아무것도 하지 않음, 원래 위치에 작게 유지
+            e.preventDefault();
+        });
+        
+        unitEl.addEventListener('touchend', (e) => {
+            if (isDragging) {
+                // 드래그 끝 로직
+                const touch = e.changedTouches[0];
+                const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
+                
+                // 드롭 처리
+                if (dropTarget) {
+                    const shopArea = dropTarget.closest('#shopArea');
+                    if (shopArea) {
+                        // 상점에 드롭 - 판매
+                        currentGame.sellChampion(unit, fromBench);
+                        updateUI();
+                    } else {
+                        const benchArea = dropTarget.closest('#benchArea');
+                        if (benchArea) {
+                            // 벤치에 드롭 - 필드에서 벤치로 이동
+                            if (!fromBench) {
+                                currentGame.removeUnit(unit);
+                                updateUI();
+                            }
+                        } else {
+                            const battleGrid = dropTarget.closest('#battleGrid');
+                            if (battleGrid) {
+                                // 필드에 드롭 - 배치 시도
+                                const rect = battleGrid.getBoundingClientRect();
+                                const x = Math.floor((touch.clientX - rect.left) / (rect.width / 7));
+                                const y = Math.floor((touch.clientY - rect.top) / (rect.height / 4));
+                                if (x >= 0 && x < 7 && y >= 0 && y < 4) {
+                                    if (fromBench) {
+                                        if (currentGame.placeUnit(unit, { x, y })) {
+                                            updateUI();
+                                        }
+                                    } else {
+                                        // 필드에서 필드로 이동
+                                        if (currentGame.moveUnit(unit, { x, y })) {
+                                            updateUI();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // 클론 제거
+                if (cloneEl) {
+                    document.body.removeChild(cloneEl);
+                    cloneEl = null;
+                }
+                
+                isDragging = false;
+            } else {
+                // 터치만 했을 때 정보 표시
+                showUnitInfo(unit);
+            }
+            
+            e.preventDefault();
+        });
+        
         // 아이템 드롭 영역으로 설정
         unitEl.addEventListener('dragover', (e) => {
             e.preventDefault();
@@ -520,11 +654,21 @@ function createUnitElement(unit, fromBench) {
                         return;
                     }
                     
+                    // 기존 아이템과 조합 시도
+                    let combinedItem = item;
+                    for (let i = unit.items.length - 1; i >= 0; i--) {
+                        const existingItem = unit.items[i];
+                        const combined = combineItems(existingItem, combinedItem);
+                        if (combined) {
+                            unit.items.splice(i, 1);
+                            combinedItem = combined;
+                        }
+                    }
+                    
                     // 아이템 장착
-                    unit.items.push(item);
+                    unit.items.push(combinedItem);
                     currentGame.player.items.splice(parseInt(itemIndex), 1);
                     
-                    addLog(`${unit.name}에게 ${item.name} 장착!`);
                     updateUI();
                 }
             }
@@ -555,10 +699,7 @@ function createUnitElement(unit, fromBench) {
             if (!fromBench) {
                 if (confirm(`${unit.name}을(를) 벤치로 이동하시겠습니까?`)) {
                     if (currentGame.removeUnit(unit)) {
-                        addLog(`${unit.name}을(를) 벤치로 이동`);
                         updateUI();
-                    } else {
-                        addLog('이동 실패! (벤치가 가득 참)');
                     }
                 }
             }
@@ -590,11 +731,15 @@ function createUnitElement(unit, fromBench) {
             e.stopPropagation();
             if (confirm(`${unit.name}을(를) 판매하시겠습니까? (+${unit.cost * (unit.stars || 1)}G)`)) {
                 currentGame.sellChampion(unit, fromBench);
-                addLog(`${unit.name} 판매! (+${unit.cost * (unit.stars || 1)}G)`);
                 updateUI();
             }
         });
     }
+    
+    // 클릭 시 정보 표시
+    unitEl.addEventListener('click', () => {
+        showUnitInfo(unit);
+    });
     
     return unitEl;
 }
@@ -604,11 +749,8 @@ function handleFieldClick(x, y, unit) {
     if (selectedUnit && selectedUnit !== unit) {
         // 벤치에서 선택한 유닛을 배치
         if (currentGame.placeUnit(selectedUnit, { x, y })) {
-            addLog(`${selectedUnit.name}을(를) 배치`);
             selectedUnit = null;
             updateUI();
-        } else {
-            addLog('배치 실패! (레벨 제한 또는 위치 중복)');
         }
     }
 }
@@ -621,11 +763,9 @@ function handleFieldDrop(e, x, y) {
     
     // 유닛 배치
     if (currentGame.placeUnit(draggedUnit.unit, { x, y })) {
-        addLog(`${draggedUnit.unit.name}을(를) (${x}, ${y})에 배치`);
         draggedUnit = null;
         updateUI();
     } else {
-        addLog('배치 실패! (레벨 제한)');
         // 실패 시 원래 위치로 복구
         updateUI();
     }
@@ -634,38 +774,6 @@ function handleFieldDrop(e, x, y) {
 // 유닛 선택
 function selectUnit(unit, fromBench) {
     selectedUnit = fromBench ? unit : null;
-    showChampionDetail(unit);
-}
-
-// 챔피언 정보 표시
-function showChampionDetail(unit) {
-    const detail = document.getElementById('championDetail');
-    
-    const stars = '⭐'.repeat(unit.stars || 1);
-    const traits = unit.traits.join(', ');
-    
-    detail.innerHTML = `
-        <div class="detail-header">
-            <strong>${unit.name}</strong>
-            <span>${stars}</span>
-        </div>
-        <div style="color: #aaa; font-size: 11px; margin-bottom: 10px;">${traits}</div>
-        <div class="detail-stats">
-            <div class="stat-row"><span>💰 코스트:</span><span>${unit.cost}</span></div>
-            <div class="stat-row"><span>❤️ 체력:</span><span>${unit.stats.hp}</span></div>
-            <div class="stat-row"><span>⚔️ 공격력:</span><span>${unit.stats.attackDamage}</span></div>
-            <div class="stat-row"><span>🛡️ 방어력:</span><span>${unit.stats.armor}</span></div>
-            <div class="stat-row"><span>✨ 마저:</span><span>${unit.stats.magicResist}</span></div>
-            <div class="stat-row"><span>⚡ 공속:</span><span>${unit.stats.attackSpeed.toFixed(2)}</span></div>
-            <div class="stat-row"><span>🎯 사거리:</span><span>${unit.stats.attackRange}</span></div>
-        </div>
-        ${unit.skill ? `
-            <div style="margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 5px;">
-                <strong style="color: #f39c12;">💥 ${unit.skill.name}</strong>
-                <p style="font-size: 11px; margin-top: 5px;">${unit.skill.description}</p>
-            </div>
-        ` : ''}
-    `;
 }
 
 // 아이템 업데이트
@@ -682,6 +790,7 @@ function updateItems(items) {
         const itemEl = document.createElement('div');
         itemEl.className = 'item-slot';
         itemEl.draggable = true;
+        itemEl.dataset.itemIndex = index;
         itemEl.innerHTML = `
             <div class="item-icon">${item.icon}</div>
             <div class="item-name">${item.name}</div>
@@ -698,12 +807,88 @@ function updateItems(items) {
             itemEl.style.opacity = '1';
         });
         
+        // 모바일 터치 드래그
+        itemEl.addEventListener('touchstart', (e) => {
+            let isDragging = true;
+            const touch = e.touches[0];
+            let draggedItem = item;
+            let cloneEl = itemEl.cloneNode(true);
+            cloneEl.style.position = 'absolute';
+            cloneEl.style.zIndex = '1000';
+            cloneEl.style.opacity = '0.8';
+            cloneEl.style.pointerEvents = 'none';
+            document.body.appendChild(cloneEl);
+            
+            const moveHandler = (e) => {
+                if (!isDragging) return;
+                const touch = e.touches[0];
+                cloneEl.style.left = (touch.clientX - 25) + 'px';
+                cloneEl.style.top = (touch.clientY - 25) + 'px';
+                e.preventDefault();
+            };
+            
+            const endHandler = (e) => {
+                isDragging = false;
+                const touch = e.changedTouches[0];
+                const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
+                
+                if (dropTarget) {
+                    const unitEl = dropTarget.closest('.unit-card');
+                    if (unitEl) {
+                        // 유닛에 아이템 장착 시도
+                        const from = unitEl.dataset.from === 'bench';
+                        const unitIndex = parseInt(unitEl.dataset.index);
+                        const unit = from ? currentGame.player.bench[unitIndex] : currentGame.player.units[unitIndex];
+                        if (currentGame.equipItem(unit, draggedItem)) {
+                            updateUI();
+                        }
+                    }
+                }
+                
+                document.body.removeChild(cloneEl);
+                document.removeEventListener('touchmove', moveHandler);
+                document.removeEventListener('touchend', endHandler);
+            };
+            
+            document.addEventListener('touchmove', moveHandler, { passive: false });
+            document.addEventListener('touchend', endHandler, { passive: false });
+            e.preventDefault();
+        }, { passive: false });
+        
         itemEl.addEventListener('click', () => {
             selectedItem = item;
             alert(`${item.name}\n${item.description}\n\n유닛에게 드래그하여 장착하세요.`);
         });
         
         storage.appendChild(itemEl);
+    });
+    
+    // 아이템 보관함 드롭 이벤트 (조합용)
+    storage.addEventListener('dragover', (e) => {
+        e.preventDefault();
+    });
+    
+    storage.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const draggedItemIndex = e.dataTransfer.getData('itemIndex');
+        if (draggedItemIndex !== '') {
+            const draggedItem = items[parseInt(draggedItemIndex)];
+            // 보관함에 있는 다른 아이템들과 조합 시도
+            for (let i = 0; i < items.length; i++) {
+                if (i !== parseInt(draggedItemIndex)) {
+                    const combined = combineItems(draggedItem, items[i]);
+                    if (combined) {
+                        // 조합 성공
+                        currentGame.player.items.splice(parseInt(draggedItemIndex), 1);
+                        currentGame.player.items.splice(i > parseInt(draggedItemIndex) ? i - 1 : i, 1);
+                        currentGame.player.items.push(combined);
+                        updateUI();
+                        return;
+                    }
+                }
+            }
+            // 조합 실패 시 아무것도 하지 않음
+        }
     });
 }
 
@@ -728,23 +913,8 @@ function updateSynergies(synergyData) {
     });
 }
 
-// 로그 추가
-function addLog(message) {
-    const log = document.getElementById('gameLog');
-    const entry = document.createElement('div');
-    entry.className = 'log-entry';
-    entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-    log.insertBefore(entry, log.firstChild);
-    
-    // 최대 50개 항목만 유지
-    while (log.children.length > 50) {
-        log.removeChild(log.lastChild);
-    }
-}
-
 // 전투 시작
 function startBattleSequence() {
-    addLog('⚔️ 전투 시작!');
     
     // 다른 플레이어 필드를 보고 있었다면 내 필드로 돌아오기
     if (isViewingOtherPlayer) {
@@ -1103,12 +1273,10 @@ function showGameOver(winner, placement) {
             title.textContent = '� 1등!';
             title.style.color = '#f39c12';
             message.textContent = '축하합니다! 배틀로얄에서 우승했습니다!';
-            addLog('� 배틀로얄 우승!');
         } else {
             title.textContent = `${placement}등`;
             title.style.color = '#e74c3c';
             message.textContent = `체력이 0이 되어 탈락했습니다. (${placement}위)`;
-            addLog(`💀 ${placement}위로 탈락`);
         }
         
         modal.classList.add('active');
@@ -1155,7 +1323,6 @@ function setupBattleResultCallback() {
                 } else {
                     resultMessage.textContent = `AI를 물리쳤습니다! ${result.playerUnitsLeft}명 생존`;
                 }
-                addLog(`✅ 라운드 ${this.round} 승리! (생존: ${result.playerUnitsLeft}명)`);
             } else {
                 resultTitle.textContent = '패배';
                 resultTitle.style.color = '#e74c3c';
@@ -1165,7 +1332,6 @@ function setupBattleResultCallback() {
                 } else {
                     resultMessage.textContent = `AI에게 패배했습니다. ${result.enemyUnitsLeft}명 남음`;
                 }
-                addLog(`❌ 라운드 ${this.round} 패배`);
             }
         }, 500);
     };
@@ -1187,13 +1353,14 @@ function showChampionTooltip(unit, event) {
     
     // 스탯
     const statsEl = document.getElementById('tooltipStats');
+    const effectiveStats = calculateUnitStatsWithItems(unit);
     statsEl.innerHTML = `
-        <div class="tooltip-stat-line"><span>체력:</span><span>${unit.stats.hp}</span></div>
-        <div class="tooltip-stat-line"><span>공격력:</span><span>${unit.stats.attackDamage}</span></div>
-        <div class="tooltip-stat-line"><span>방어력:</span><span>${unit.stats.armor}</span></div>
-        <div class="tooltip-stat-line"><span>마법저항:</span><span>${unit.stats.magicResist}</span></div>
-        <div class="tooltip-stat-line"><span>공격속도:</span><span>${unit.stats.attackSpeed.toFixed(2)}</span></div>
-        <div class="tooltip-stat-line"><span>사거리:</span><span>${unit.stats.attackRange}</span></div>
+        <div class="tooltip-stat-line"><span>체력:</span><span>${effectiveStats.hp}</span></div>
+        <div class="tooltip-stat-line"><span>공격력:</span><span>${effectiveStats.attackDamage}</span></div>
+        <div class="tooltip-stat-line"><span>방어력:</span><span>${effectiveStats.armor}</span></div>
+        <div class="tooltip-stat-line"><span>마법저항:</span><span>${effectiveStats.magicResist}</span></div>
+        <div class="tooltip-stat-line"><span>공격속도:</span><span>${effectiveStats.attackSpeed.toFixed(2)}</span></div>
+        <div class="tooltip-stat-line"><span>사거리:</span><span>${effectiveStats.attackRange}</span></div>
     `;
     
     // 스킬
