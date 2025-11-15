@@ -102,7 +102,7 @@ class TFTGame {
     start() {
         this.round = 1;
         this.stage = 1;
-        this.player.gold = 4;
+        this.player.gold = 10000; // 테스트용: 시작 골드 대폭 증가
         
         // 테스트용: 시작 시 랜덤 아이템 4개 지급
         const baseItemKeys = Object.keys(BASE_ITEMS);
@@ -565,34 +565,34 @@ class TFTGame {
     placeUnit(unit, position) {
         const benchIndex = this.player.bench.indexOf(unit);
         if (benchIndex < 0) return false;
-        
-        // 레벨 제한 확인
-        if (this.player.units.length >= this.player.level) {
-            return false;
-        }
-        
+
         // 위치 확인
         if (position.x < 0 || position.x >= 7 || position.y < 0 || position.y >= 4) {
             return false;
         }
-        
+
         // 이미 유닛이 있는지 확인
         const existingUnit = this.player.units.find(u => 
             u.position.x === position.x && u.position.y === position.y
         );
-        
+
+        // 레벨 제한: 빈 칸에 새로 배치할 때만 적용 (교체는 허용)
+        if (!existingUnit && this.player.units.length >= this.player.level) {
+            return false;
+        }
+
         if (existingUnit) {
             // 위치 교환
             existingUnit.position = null;
             this.player.bench.push(existingUnit);
             this.player.units.splice(this.player.units.indexOf(existingUnit), 1);
         }
-        
+
         // 배치
         unit.position = position;
         this.player.units.push(unit);
         this.player.bench.splice(benchIndex, 1);
-        
+
         return true;
     }
 

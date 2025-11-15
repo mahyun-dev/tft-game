@@ -592,22 +592,22 @@ function processItemEffects(unit, eventType, data = {}) {
 // 아이템 조합 함수
 function combineItems(item1, item2) {
     if (!item1 || !item2) return null;
-    
+
     // 기본 아이템만 조합 가능
     if (!(item1.id in BASE_ITEMS) || !(item2.id in BASE_ITEMS)) return null;
-    
-    const key1 = item1.id;
-    const key2 = item2.id;
-    const combinedKey = key1 < key2 ? `${key1}+${key2}` : `${key2}+${key1}`;
-    
+
+    // 항상 사전순으로 조합 키 생성
+    const ids = [item1.id, item2.id].sort();
+    const combinedKey = `${ids[0]}+${ids[1]}`;
+
     // 미리 정의된 조합 아이템이 있으면 반환
-    if (COMBINED_ITEMS[combinedKey] || COMBINED_ITEMS[key1 + '+' + key2] || COMBINED_ITEMS[key2 + '+' + key1]) {
-        return COMBINED_ITEMS[combinedKey] || COMBINED_ITEMS[key1 + '+' + key2] || COMBINED_ITEMS[key2 + '+' + key1];
+    if (COMBINED_ITEMS[combinedKey]) {
+        return COMBINED_ITEMS[combinedKey];
     }
-    
+
     // 같은 아이템이면 조합 불가
-    if (key1 === key2) return null;
-    
+    if (ids[0] === ids[1]) return null;
+
     // 다른 아이템이면 기본 조합 생성
     const combinedStats = {};
     if (item1.stats) {
@@ -622,9 +622,9 @@ function combineItems(item1, item2) {
             }
         });
     }
-    
+
     return {
-        id: `combined_${key1}_${key2}`,
+        id: `combined_${ids[0]}_${ids[1]}`,
         name: `${item1.name} + ${item2.name}`,
         description: `${item1.description}, ${item2.description}`,
         icon: '🔧',

@@ -1,8 +1,8 @@
 // UI 컨트롤러 - HTML과 게임 로직 연결
 
 let currentGame = null;
-let selectedUnit = null;
-let selectedItem = null;
+let selectedUnit = null; // {unit, fromBench} or null
+let selectedItem = null; // item object or null
 let draggedUnit = null;
 let currentViewPlayerId = 0; // 0 = 플레이어, 1-7 = AI
 let isViewingOtherPlayer = false;
@@ -68,7 +68,7 @@ function updateTimer(time, phase) {
         timerLabel.textContent = '전투 중';
         timerValue.textContent = '⚔️';
         timerValue.style.color = '#e74c3c';
-    }
+}
 }
 
 // 이벤트 리스너 설정
@@ -381,21 +381,20 @@ function updateBattleField(units) {
             // 클릭 이벤트 (빈 칸에만)
             if (!unit) {
                 cell.addEventListener('click', () => handleFieldClick(x, y, null));
+                // 드래그 앤 드롭으로 벤치 유닛을 필드에 놓기
+                cell.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    cell.classList.add('highlight');
+                });
+                cell.addEventListener('dragleave', () => {
+                    cell.classList.remove('highlight');
+                });
+                cell.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    cell.classList.remove('highlight');
+                    handleFieldDrop(e, x, y);
+                });
             }
-            
-            // 드래그 앤 드롭
-            cell.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                cell.classList.add('highlight');
-            });
-            cell.addEventListener('dragleave', () => {
-                cell.classList.remove('highlight');
-            });
-            cell.addEventListener('drop', (e) => {
-                cell.classList.remove('highlight');
-                handleFieldDrop(e, x, y);
-            });
-            
             grid.appendChild(cell);
         }
     }
@@ -435,7 +434,8 @@ function updateBench(bench) {
                 slot.classList.remove('highlight');
                 
                 if (draggedUnit && !draggedUnit.fromBench) {
-                    // 필드에서 벤치로 드롭 (이미 removeUnit 호출됨)
+                    // 필드 유닛을 벤치로 이동
+                    currentGame.removeUnit(draggedUnit.unit);
                     updateUI();
                 }
             });
@@ -450,23 +450,6 @@ function updateShop(shop) {
     const shopArea = document.getElementById('shopArea');
     shopArea.innerHTML = '';
     
-    // 상점 드롭 이벤트 (유닛 판매)
-    shopArea.addEventListener('dragover', (e) => {
-        e.preventDefault();
-    });
-    
-    shopArea.addEventListener('drop', (e) => {
-        e.preventDefault();
-        const unitId = e.dataTransfer.getData('unitId');
-        if (unitId) {
-            const unit = currentGame.player.units.find(u => u.id === unitId) || currentGame.player.bench.find(u => u.id === unitId);
-            if (unit) {
-                const fromBench = currentGame.player.bench.includes(unit);
-                currentGame.sellChampion(unit, fromBench);
-                updateUI();
-            }
-        }
-    });
     
     shop.forEach((champion, index) => {
         const slot = document.createElement('div');
@@ -502,201 +485,62 @@ function updateShop(shop) {
 function createUnitElement(unit, fromBench) {
     const unitEl = document.createElement('div');
     unitEl.className = `unit-card tier-${unit.tier}`;
-    
+    // 모바일: 선택된 유닛이면 하이라이트
+    if (selectedUnit && selectedUnit.unit === unit && selectedUnit.fromBench === fromBench) {
+        unitEl.classList.add('selected');
+    }
     // 내 필드일 때만 드래그 가능
-    unitEl.draggable = !isViewingOtherPlayer;
-    
+    unitEl.draggable = !isViewingOtherPlayer ? true : false;
     const stars = '⭐'.repeat(unit.stars || 1);
-    
     unitEl.innerHTML = `
         <div class="unit-cost">${unit.cost}</div>
         <div class="unit-name">${unit.name}</div>
         <div class="unit-hp">HP: ${Math.floor(unit.currentHp || unit.stats.hp)}</div>
         <div class="unit-stars">${stars}</div>
     `;
-    
-    // 데이터 속성 추가
     unitEl.dataset.from = fromBench ? 'bench' : 'field';
     unitEl.dataset.index = fromBench ? currentGame.player.bench.indexOf(unit) : currentGame.player.units.indexOf(unit);
     unitEl.dataset.dragged = 'false';
-    
-    // 내 필드일 때만 드래그 앤 드롭 활성화
-    if (!isViewingOtherPlayer) {
-        unitEl.addEventListener('dragstart', (e) => {
-            e.dataTransfer.setData('unitId', unit.id);
-        });
-        
-        // 모바일 터치 드래그 앤 드롭
-        let isDragging = false;
-        let startX, startY;
-        let cloneEl;
-        
-        unitEl.addEventListener('touchstart', (e) => {
-            isDragging = false;
-            const touch = e.touches[0];
-            startX = touch.clientX;
-            startY = touch.clientY;
-            
-            // 드래그 판정
-            setTimeout(() => {
-                if (Math.abs(e.touches[0].clientX - startX) > 10 || Math.abs(e.touches[0].clientY - startY) > 10) {
-                    isDragging = true;
-                    
-                    // 클론 생성 - 작게 표시
-                    cloneEl = unitEl.cloneNode(true);
-                    cloneEl.style.position = 'fixed';
-                    cloneEl.style.zIndex = '1000';
-                    cloneEl.style.width = unitEl.offsetWidth + 'px';
-                    cloneEl.style.height = unitEl.offsetHeight + 'px';
-                    cloneEl.style.left = unitEl.getBoundingClientRect().left + 'px';
-                    cloneEl.style.top = unitEl.getBoundingClientRect().top + 'px';
-                    cloneEl.style.opacity = '0.8';
-                    cloneEl.style.pointerEvents = 'none';
-                    document.body.appendChild(cloneEl);
-                }
-            }, 200);
-            
-            e.preventDefault();
-        });
-        
-        unitEl.addEventListener('touchmove', (e) => {
-            if (!isDragging) return;
-            // 이동 시 아무것도 하지 않음, 원래 위치에 작게 유지
-            e.preventDefault();
-        });
-        
+
+    // 모바일: 터치로 유닛 선택/배치
+    if (!isViewingOtherPlayer && window.innerWidth < 768) {
         unitEl.addEventListener('touchend', (e) => {
-            if (isDragging) {
-                // 드래그 끝 로직
-                const touch = e.changedTouches[0];
-                const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
-                
-                // 드롭 처리
-                if (dropTarget) {
-                    const shopArea = dropTarget.closest('#shopArea');
-                    if (shopArea) {
-                        // 상점에 드롭 - 판매
-                        currentGame.sellChampion(unit, fromBench);
-                        updateUI();
-                    } else {
-                        const benchArea = dropTarget.closest('#benchArea');
-                        if (benchArea) {
-                            // 벤치에 드롭 - 필드에서 벤치로 이동
-                            if (!fromBench) {
-                                currentGame.removeUnit(unit);
-                                updateUI();
-                            }
-                        } else {
-                            const battleGrid = dropTarget.closest('#battleGrid');
-                            if (battleGrid) {
-                                // 필드에 드롭 - 배치 시도
-                                const rect = battleGrid.getBoundingClientRect();
-                                const x = Math.floor((touch.clientX - rect.left) / (rect.width / 7));
-                                const y = Math.floor((touch.clientY - rect.top) / (rect.height / 4));
-                                if (x >= 0 && x < 7 && y >= 0 && y < 4) {
-                                    if (fromBench) {
-                                        if (currentGame.placeUnit(unit, { x, y })) {
-                                            updateUI();
-                                        }
-                                    } else {
-                                        // 필드에서 필드로 이동
-                                        if (currentGame.moveUnit(unit, { x, y })) {
-                                            updateUI();
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // 클론 제거
-                if (cloneEl) {
-                    document.body.removeChild(cloneEl);
-                    cloneEl = null;
-                }
-                
-                isDragging = false;
-            } else {
-                // 터치만 했을 때 정보 표시
-                showUnitInfo(unit);
+            e.preventDefault();
+            e.stopPropagation();
+            // 이미 선택된 유닛을 다시 터치하면 선택 해제
+            if (selectedUnit && selectedUnit.unit === unit && selectedUnit.fromBench === fromBench) {
+                selectedUnit = null;
+                updateUI();
+                return;
             }
-            
-            e.preventDefault();
-        });
-        
-        // 아이템 드롭 영역으로 설정
-        unitEl.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            unitEl.style.borderColor = '#ffd700';
-        });
-        
-        unitEl.addEventListener('dragleave', (e) => {
-            e.stopPropagation();
-            unitEl.style.borderColor = '';
-        });
-        
-        unitEl.addEventListener('drop', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            unitEl.style.borderColor = '';
-            
-            const itemIndex = e.dataTransfer.getData('itemIndex');
-            if (itemIndex !== '') {
-                // 아이템을 유닛에 장착
-                const item = currentGame.player.items[parseInt(itemIndex)];
-                if (item) {
-                    if (!unit.items) unit.items = [];
-                    
-                    if (unit.items.length >= 3) {
-                        alert('유닛은 최대 3개의 아이템만 장착할 수 있습니다!');
-                        return;
-                    }
-                    
-                    // 기존 아이템과 조합 시도
-                    let combinedItem = item;
-                    for (let i = unit.items.length - 1; i >= 0; i--) {
-                        const existingItem = unit.items[i];
-                        const combined = combineItems(existingItem, combinedItem);
-                        if (combined) {
-                            unit.items.splice(i, 1);
-                            combinedItem = combined;
-                        }
-                    }
-                    
-                    // 아이템 장착
-                    unit.items.push(combinedItem);
-                    currentGame.player.items.splice(parseInt(itemIndex), 1);
-                    
-                    updateUI();
-                }
-            }
-        });
+            // 유닛 선택
+            selectedUnit = { unit, fromBench };
+            updateUI();
+        }, { passive: false });
     }
-    
-    // 툴팁 이벤트
-    unitEl.addEventListener('mouseenter', (e) => {
-        showChampionTooltip(unit, e);
-    });
-    
-    unitEl.addEventListener('mousemove', (e) => {
-        updateTooltipPosition(e);
-    });
-    
-    unitEl.addEventListener('mouseleave', () => {
-        hideChampionTooltip();
-    });
-    
-    // 내 필드일 때만 클릭/드래그 이벤트 활성화
-    if (!isViewingOtherPlayer) {
-        // 클릭 이벤트
+
+    // 데스크탑: 기존 드래그 앤 드롭/클릭 로직 유지
+    if (!isViewingOtherPlayer && window.innerWidth >= 768) {
+        unitEl.addEventListener('dragstart', (e) => {
+            e.stopPropagation();
+            draggedUnit = { unit, fromBench };
+            e.dataTransfer.setData('unitId', String(unit.id));
+            e.dataTransfer.setData('fromBench', fromBench ? '1' : '0');
+            unitEl.style.opacity = '0.5';
+        });
+        unitEl.addEventListener('dragend', (e) => {
+            e.stopPropagation();
+            unitEl.style.opacity = '1';
+            draggedUnit = null;
+            setTimeout(() => updateUI(), 100);
+        });
+        // 클릭: 벤치 유닛 선택, 필드 유닛 클릭시 벤치로 이동
         unitEl.addEventListener('click', (e) => {
             e.stopPropagation();
-            selectUnit(unit, fromBench);
-            
-            // 필드의 유닛을 클릭하면 벤치로 이동
-            if (!fromBench) {
+            if (fromBench) {
+                selectedUnit = { unit, fromBench };
+                updateUI();
+            } else {
                 if (confirm(`${unit.name}을(를) 벤치로 이동하시겠습니까?`)) {
                     if (currentGame.removeUnit(unit)) {
                         updateUI();
@@ -704,28 +548,7 @@ function createUnitElement(unit, fromBench) {
                 }
             }
         });
-        
-        // 드래그 시작
-        unitEl.addEventListener('dragstart', (e) => {
-            e.stopPropagation();
-            draggedUnit = { unit, fromBench };
-            unitEl.style.opacity = '0.5';
-            
-            // 필드 유닛인 경우 먼저 벤치로 이동
-            if (!fromBench) {
-                currentGame.removeUnit(unit);
-            }
-        });
-        
-        unitEl.addEventListener('dragend', (e) => {
-            e.stopPropagation();
-            unitEl.style.opacity = '1';
-            draggedUnit = null;
-            // 드래그가 실패한 경우를 대비해 UI 업데이트
-            setTimeout(() => updateUI(), 100);
-        });
-        
-        // 우클릭으로 판매
+        // 우클릭 판매
         unitEl.addEventListener('contextmenu', (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -735,22 +558,88 @@ function createUnitElement(unit, fromBench) {
             }
         });
     }
-    
-    // 클릭 시 정보 표시
-    unitEl.addEventListener('click', () => {
-        showUnitInfo(unit);
+
+    // 아이템 드롭 영역 (데스크탑)
+    unitEl.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        unitEl.style.borderColor = '#ffd700';
     });
-    
+    unitEl.addEventListener('dragleave', (e) => {
+        e.stopPropagation();
+        unitEl.style.borderColor = '';
+    });
+    unitEl.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        unitEl.style.borderColor = '';
+        const itemIndex = e.dataTransfer.getData('itemIndex');
+        if (itemIndex !== '') {
+            // 아이템을 유닛에 장착
+            const item = currentGame.player.items[parseInt(itemIndex)];
+            if (item) {
+                if (!unit.items) unit.items = [];
+                if (unit.items.length >= 3) {
+                    alert('유닛은 최대 3개의 아이템만 장착할 수 있습니다!');
+                    return;
+                }
+                // 기존 아이템과 조합 시도
+                let combinedItem = item;
+                for (let i = unit.items.length - 1; i >= 0; i--) {
+                    const existingItem = unit.items[i];
+                    const combined = combineItems(existingItem, combinedItem);
+                    if (combined) {
+                        unit.items.splice(i, 1);
+                        combinedItem = combined;
+                    }
+                }
+                // 아이템 장착
+                unit.items.push(combinedItem);
+                currentGame.player.items.splice(parseInt(itemIndex), 1);
+                updateUI();
+            }
+        }
+    });
+
+    // 툴팁 이벤트
+    unitEl.addEventListener('mouseenter', (e) => {
+        showChampionTooltip(unit, e);
+    });
+    unitEl.addEventListener('mousemove', (e) => {
+        updateTooltipPosition(e);
+    });
+    unitEl.addEventListener('mouseleave', () => {
+        hideChampionTooltip();
+    });
+
     return unitEl;
 }
 
-// 필드 클릭 처리
+// 필드 클릭/터치 처리 (모바일: 선택-배치, 데스크탑: 기존 로직)
 function handleFieldClick(x, y, unit) {
-    if (selectedUnit && selectedUnit !== unit) {
-        // 벤치에서 선택한 유닛을 배치
-        if (currentGame.placeUnit(selectedUnit, { x, y })) {
-            selectedUnit = null;
-            updateUI();
+    if (window.innerWidth < 768) {
+        // 모바일: 선택된 유닛이 있으면 배치 시도
+        if (selectedUnit) {
+            if (selectedUnit.fromBench) {
+                if (currentGame.placeUnit(selectedUnit.unit, { x, y })) {
+                    selectedUnit = null;
+                    updateUI();
+                }
+            } else {
+                // 필드 유닛 이동
+                if (currentGame.moveUnit(selectedUnit.unit, { x, y })) {
+                    selectedUnit = null;
+                    updateUI();
+                }
+            }
+        }
+    } else {
+        // 데스크탑: 기존 로직 (벤치 유닛만 배치)
+        if (selectedUnit && selectedUnit.fromBench) {
+            if (currentGame.placeUnit(selectedUnit.unit, { x, y })) {
+                selectedUnit = null;
+                updateUI();
+            }
         }
     }
 }
@@ -758,16 +647,24 @@ function handleFieldClick(x, y, unit) {
 // 필드 드롭 처리
 function handleFieldDrop(e, x, y) {
     e.preventDefault();
-    
     if (!draggedUnit) return;
-    
-    // 유닛 배치
-    if (currentGame.placeUnit(draggedUnit.unit, { x, y })) {
-        draggedUnit = null;
-        updateUI();
+    const { unit, fromBench } = draggedUnit;
+    if (!unit) return;
+
+    // 벤치 유닛은 빈 칸에만 배치 가능 (교체 불가)
+    if (fromBench) {
+        const isOccupied = currentGame.player.units.some(u => u.position && u.position.x === x && u.position.y === y);
+        if (isOccupied) return;
+        const result = currentGame.placeUnit(unit, { x, y });
+        if (result) updateUI();
+        return;
     } else {
-        // 실패 시 원래 위치로 복구
-        updateUI();
+        // 필드 유닛은 빈 칸에만 이동 가능 (교체 불가)
+        const isOccupied = currentGame.player.units.some(u => u.position && u.position.x === x && u.position.y === y);
+        if (isOccupied) return;
+        const result = currentGame.moveUnit(unit, { x, y });
+        if (result) updateUI();
+        return;
     }
 }
 
@@ -780,115 +677,75 @@ function selectUnit(unit, fromBench) {
 function updateItems(items) {
     const storage = document.getElementById('itemStorage');
     storage.innerHTML = '';
-    
     if (items.length === 0) {
         storage.innerHTML = '<p class="empty-message">아이템 없음</p>';
         return;
     }
-    
     items.forEach((item, index) => {
         const itemEl = document.createElement('div');
         itemEl.className = 'item-slot';
+        if (selectedItem && selectedItem.id === item.id) {
+            itemEl.classList.add('selected');
+        }
         itemEl.draggable = true;
         itemEl.dataset.itemIndex = index;
         itemEl.innerHTML = `
             <div class="item-icon">${item.icon}</div>
             <div class="item-name">${item.name}</div>
         `;
-        
-        // 드래그 시작
-        itemEl.addEventListener('dragstart', (e) => {
-            e.dataTransfer.setData('itemIndex', index);
-            e.dataTransfer.setData('itemId', item.id);
-            itemEl.style.opacity = '0.5';
-        });
-        
-        itemEl.addEventListener('dragend', (e) => {
-            itemEl.style.opacity = '1';
-        });
-        
-        // 모바일 터치 드래그
-        itemEl.addEventListener('touchstart', (e) => {
-            let isDragging = true;
-            const touch = e.touches[0];
-            let draggedItem = item;
-            let cloneEl = itemEl.cloneNode(true);
-            cloneEl.style.position = 'absolute';
-            cloneEl.style.zIndex = '1000';
-            cloneEl.style.opacity = '0.8';
-            cloneEl.style.pointerEvents = 'none';
-            document.body.appendChild(cloneEl);
-            
-            const moveHandler = (e) => {
-                if (!isDragging) return;
-                const touch = e.touches[0];
-                cloneEl.style.left = (touch.clientX - 25) + 'px';
-                cloneEl.style.top = (touch.clientY - 25) + 'px';
+        // 데스크탑: 드래그 앤 드롭 조합/장착
+        if (window.innerWidth >= 768) {
+            itemEl.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('itemIndex', index);
+                e.dataTransfer.setData('itemId', item.id);
+                itemEl.style.opacity = '0.5';
+            });
+            itemEl.addEventListener('dragend', (e) => {
+                itemEl.style.opacity = '1';
+            });
+            itemEl.addEventListener('dragover', (e) => {
                 e.preventDefault();
-            };
-            
-            const endHandler = (e) => {
-                isDragging = false;
-                const touch = e.changedTouches[0];
-                const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
-                
-                if (dropTarget) {
-                    const unitEl = dropTarget.closest('.unit-card');
-                    if (unitEl) {
-                        // 유닛에 아이템 장착 시도
-                        const from = unitEl.dataset.from === 'bench';
-                        const unitIndex = parseInt(unitEl.dataset.index);
-                        const unit = from ? currentGame.player.bench[unitIndex] : currentGame.player.units[unitIndex];
-                        if (currentGame.equipItem(unit, draggedItem)) {
-                            updateUI();
-                        }
-                    }
-                }
-                
-                document.body.removeChild(cloneEl);
-                document.removeEventListener('touchmove', moveHandler);
-                document.removeEventListener('touchend', endHandler);
-            };
-            
-            document.addEventListener('touchmove', moveHandler, { passive: false });
-            document.addEventListener('touchend', endHandler, { passive: false });
-            e.preventDefault();
-        }, { passive: false });
-        
-        itemEl.addEventListener('click', () => {
-            selectedItem = item;
-            alert(`${item.name}\n${item.description}\n\n유닛에게 드래그하여 장착하세요.`);
-        });
-        
-        storage.appendChild(itemEl);
-    });
-    
-    // 아이템 보관함 드롭 이벤트 (조합용)
-    storage.addEventListener('dragover', (e) => {
-        e.preventDefault();
-    });
-    
-    storage.addEventListener('drop', (e) => {
-        e.preventDefault();
-        const draggedItemIndex = e.dataTransfer.getData('itemIndex');
-        if (draggedItemIndex !== '') {
-            const draggedItem = items[parseInt(draggedItemIndex)];
-            // 보관함에 있는 다른 아이템들과 조합 시도
-            for (let i = 0; i < items.length; i++) {
-                if (i !== parseInt(draggedItemIndex)) {
-                    const combined = combineItems(draggedItem, items[i]);
+                e.stopPropagation();
+            });
+            itemEl.addEventListener('drop', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const fromIndex = parseInt(e.dataTransfer.getData('itemIndex'));
+                if (fromIndex !== index && !isNaN(fromIndex)) {
+                    const itemA = currentGame.player.items[fromIndex];
+                    const itemB = currentGame.player.items[index];
+                    const combined = combineItems(itemA, itemB);
                     if (combined) {
-                        // 조합 성공
-                        currentGame.player.items.splice(parseInt(draggedItemIndex), 1);
-                        currentGame.player.items.splice(i > parseInt(draggedItemIndex) ? i - 1 : i, 1);
+                        currentGame.player.items.splice(Math.max(fromIndex, index), 1);
+                        currentGame.player.items.splice(Math.min(fromIndex, index), 1);
                         currentGame.player.items.push(combined);
                         updateUI();
-                        return;
+                    } else {
+                        alert('이 조합은 불가능합니다.');
                     }
                 }
-            }
-            // 조합 실패 시 아무것도 하지 않음
+            });
+            itemEl.addEventListener('click', () => {
+                selectedItem = item;
+                alert(`${item.name}\n${item.description}\n\n유닛에게 드래그하여 장착하거나, 다른 아이템과 조합해보세요.`);
+            });
+        } else {
+            // 모바일: 터치로 아이템 선택/장착/조합
+            itemEl.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                // 이미 선택된 아이템을 다시 터치하면 선택 해제
+                if (selectedItem && selectedItem.id === item.id) {
+                    selectedItem = null;
+                    updateUI();
+                    return;
+                }
+                // 아이템 선택
+                selectedItem = item;
+                updateUI();
+            }, { passive: false });
         }
+        storage.appendChild(itemEl);
     });
 }
 
@@ -1010,85 +867,34 @@ function animateBattle() {
             if (currentGame.currentOpponent && currentGame.currentOpponent.units) {
                 enemyTeam = currentGame.currentOpponent.units;
             } else {
-                enemyTeam = [];
+                // PVP 라운드 - 현재 대전 상대의 유닛
+                if (currentGame.currentOpponent && currentGame.currentOpponent.units) {
+                    enemyTeam = currentGame.currentOpponent.units;
+                }
             }
         }
-        
-        // 적 유닛 배치 - 상단 4행 (행 0-3)
-        battleUnits.enemy = enemyTeam.map((unit, i) => {
-            const gridX = unit.position ? unit.position.x : (i % 7); // 0-6
-            const gridY = unit.position ? unit.position.y : Math.floor(i / 7); // 0-3
-            
+
+        // 적 유닛 - 상단 4행 (행 0-3)
+        battleUnits.enemy = enemyTeam.map((unit) => {
+            const gridX = unit.position ? unit.position.x : 0; // 0-6
+            const gridY = unit.position ? unit.position.y : 0; // 0-3
+
             return {
                 name: unit.name,
                 hp: unit.stats.hp,
                 maxHp: unit.stats.hp,
                 currentHp: unit.stats.hp,
-                x: startX + cellWidth * (gridX + 0.5), // 셀 중앙
-                y: startY + cellHeight * (gridY + 0.5), // 상단 4행 + 중앙
-                color: isPVE ? '#e74c3c' : '#3498db',
+                x: startX + cellWidth * (gridX + 0.5),
+                y: startY + cellHeight * (gridY + 0.5),
+                color: '#e74c3c',
                 size: 25,
                 attacking: false,
                 attackFrame: 0,
-                tier: unit.tier || 1,
-                cost: unit.cost || 0,
+                tier: unit.tier,
+                cost: unit.cost,
                 stars: unit.stars || 1
             };
         });
-    }
-    
-    initBattleUnits();
-    
-    // 유닛 그리기
-    function drawUnit(unit) {
-        // 공격 애니메이션
-        let offsetX = 0;
-        if (unit.attacking) {
-            offsetX = Math.sin(unit.attackFrame * 0.5) * 10;
-            unit.attackFrame++;
-            if (unit.attackFrame > 10) {
-                unit.attacking = false;
-                unit.attackFrame = 0;
-            }
-        }
-        
-        // 유닛 원
-        ctx.fillStyle = unit.color;
-        ctx.beginPath();
-        ctx.arc(unit.x + offsetX, unit.y, unit.size, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // 테두리 (티어별)
-        ctx.strokeStyle = getTierColor(unit.tier);
-        ctx.lineWidth = 3;
-        ctx.stroke();
-        
-        // 체력바
-        const hpPercent = unit.currentHp / unit.maxHp;
-        const barWidth = unit.size * 2;
-        const barHeight = 5;
-        const barX = unit.x - unit.size;
-        const barY = unit.y - unit.size - 10;
-        
-        // 체력바 배경
-        ctx.fillStyle = '#333';
-        ctx.fillRect(barX, barY, barWidth, barHeight);
-        
-        // 체력바
-        ctx.fillStyle = hpPercent > 0.5 ? '#27ae60' : hpPercent > 0.25 ? '#f39c12' : '#e74c3c';
-        ctx.fillRect(barX, barY, barWidth * hpPercent, barHeight);
-        
-        // 이름
-        ctx.fillStyle = '#fff';
-        ctx.font = '10px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(unit.name, unit.x, unit.y + unit.size + 15);
-        
-        // 성급 표시 (코스트 대신)
-        const stars = '⭐'.repeat(unit.stars || 1);
-        ctx.fillStyle = '#ffd700';
-        ctx.font = 'bold 11px Arial';
-        ctx.fillText(stars, unit.x, unit.y + 5);
     }
     
     // 티어별 색상
@@ -1169,7 +975,7 @@ function animateBattle() {
             });
         }
     }
-    
+
     // 죽은 유닛 제거
     function updateUnits() {
         battleUnits.player = battleUnits.player.filter(u => u.currentHp > 0);
@@ -1491,4 +1297,5 @@ function updateScoutContent(playerId) {
             grid.appendChild(cell);
         }
     }
+    
 }
