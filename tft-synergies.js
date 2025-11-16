@@ -734,13 +734,68 @@ function calculateSynergies(units) {
 
 // 시너지 효과 적용
 function applySynergies(units, allAllies = null) {
-    const { activeSynergies } = calculateSynergies(units);
+    // 유닛 복사 (원본 수정 방지)
+    const unitsCopy = units.map(u => JSON.parse(JSON.stringify(u)));
     const allies = allAllies || units;
+    const alliesCopy = allies.map(u => JSON.parse(JSON.stringify(u)));
+
+    const { activeSynergies } = calculateSynergies(unitsCopy);
 
     activeSynergies.forEach(synergy => {
-        const synergyUnits = units.filter(u => u.traits && u.traits.includes(synergy.trait));
-        synergy.bonus(synergyUnits, allies);
+        const synergyUnits = unitsCopy.filter(u => u.traits && u.traits.includes(synergy.trait));
+        synergy.bonus(synergyUnits, alliesCopy);
     });
 
-    return activeSynergies;
+    return { activeSynergies, unitsWithSynergies: unitsCopy };
+}
+
+// 시너지 적용된 유닛 스탯 계산 (표시용)
+function getUnitStatsWithSynergies(unit, allUnits) {
+    // 유닛 복사
+    const tempUnit = JSON.parse(JSON.stringify(unit));
+    // 전체 유닛 복사 (시너지 계산용, 원본 수정 방지)
+    const allUnitsCopy = allUnits.map(u => JSON.parse(JSON.stringify(u)));
+
+    // 기본 스탯으로 리셋 (아이템 효과 포함)
+    tempUnit.stats = { ...tempUnit.baseStats };
+    // 아이템 효과 재적용
+    if (tempUnit.items) {
+        tempUnit.items.forEach(item => {
+            if (item.stats) {
+                Object.keys(item.stats).forEach(stat => {
+                    if (stat.includes('Multiplier')) {
+                        const baseStat = stat.replace('Multiplier', '');
+                        tempUnit.stats[baseStat] *= (1 + item.stats[stat]);
+                    } else if (['critChance', 'evasion', 'lifesteal', 'damageReduction', 'thornsDamage'].includes(stat)) {
+                        tempUnit[stat] = (tempUnit[stat] || 0) + item.stats[stat];
+                    } else if (stat === 'hp') {
+                        tempUnit.stats.hp += item.stats[stat];
+                    } else {
+                        tempUnit.stats[stat] = (tempUnit.stats[stat] || 0) + item.stats[stat];
+                    }
+                });
+            }
+            if (item.special) {
+                tempUnit[item.special] = true;
+            }
+        });
+    }
+
+    // 시너지 적용
+    const { activeSynergies } = calculateSynergies(allUnitsCopy);
+    activeSynergies.forEach(synergy => {
+        if (tempUnit.traits && tempUnit.traits.includes(synergy.trait)) {
+            synergy.bonus([tempUnit], allUnitsCopy);
+        }
+    });
+
+    // 버프 스탯 적용
+    if (tempUnit.buffAttackDamage) {
+        tempUnit.stats.attackDamage += tempUnit.buffAttackDamage;
+    }
+    if (tempUnit.buffHp) {
+        tempUnit.stats.hp += tempUnit.buffHp;
+    }
+
+    return tempUnit.stats;
 }

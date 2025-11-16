@@ -2,13 +2,14 @@
 // 자동 전투 로직
 
 class BattleSystem {
-    constructor() {
+    constructor(onUpdate = null) {
         this.battleGrid = {
             width: 7,
             height: 4
         };
-        this.updateInterval = 100; // ms
+        this.updateInterval = 50; // ms
         this.battleTimer = null;
+        this.onUpdate = onUpdate; // 실시간 업데이트 콜백
     }
 
     // 전투 시작
@@ -38,7 +39,11 @@ class BattleSystem {
                 items: unit.items ? [...unit.items] : [],
                 id: `${isPlayer ? 'p' : 'e'}_${unit.id}_${index}`,
                 x: unit.position.x,
-                y: isPlayer ? unit.position.y : (this.battleGrid.height - 1 - unit.position.y),
+                y: (() => {
+                    let baseY = isPlayer ? unit.position.y : (this.battleGrid.height - 1 - unit.position.y);
+                    const roleOffset = unit.role === 'tank' ? 0.3 : unit.role === 'dps' ? -0.3 : 0;
+                    return isPlayer ? Math.max(0, baseY - roleOffset) : Math.min(this.battleGrid.height - 1, baseY + roleOffset);
+                })(),
                 isPlayer: isPlayer,
                 currentHp: unit.stats.hp,
                 currentMana: 0,
@@ -168,6 +173,11 @@ class BattleSystem {
             this.updateUnits(playerTeam, enemyTeam);
             this.updateUnits(enemyTeam, playerTeam);
             
+            // 실시간 업데이트 콜백
+            if (this.onUpdate) {
+                this.onUpdate(playerTeam, enemyTeam);
+            }
+            
         }, this.updateInterval);
     }
 
@@ -224,7 +234,7 @@ class BattleSystem {
             
             if (distance > attackRange) {
                 // 이동
-                this.moveTowards(unit, unit.target);
+                this.moveTowards(unit, unit.target, allies, enemies);
             } else {
                 // 공격
                 if (unit.attackCooldown <= 0) {
@@ -235,17 +245,58 @@ class BattleSystem {
         });
     }
 
-    // 타겟 찾기 (가장 가까운 적)
+    // 타겟 찾기 (역할 기반 우선순위)
     findTarget(unit, enemies) {
         const aliveEnemies = enemies.filter(e => !e.isDead);
         if (aliveEnemies.length === 0) return null;
         
-        // 거리 순으로 정렬
-        aliveEnemies.sort((a, b) => {
+        let priorityTargets = [];
+        
+        switch (unit.role) {
+            case 'tank':
+                // 탱커: 적 탱커 > 적 딜러 > 적 서포터
+                priorityTargets = aliveEnemies.filter(e => e.role === 'tank');
+                if (priorityTargets.length === 0) priorityTargets = aliveEnemies.filter(e => e.role === 'dps');
+                if (priorityTargets.length === 0) priorityTargets = aliveEnemies.filter(e => e.role === 'support');
+                if (priorityTargets.length === 0) priorityTargets = aliveEnemies.filter(e => e.role === 'assassin');
+                break;
+            case 'dps':
+                // 딜러: 적 딜러 > 적 탱커 > 적 서포터
+                priorityTargets = aliveEnemies.filter(e => e.role === 'dps');
+                if (priorityTargets.length === 0) priorityTargets = aliveEnemies.filter(e => e.role === 'tank');
+                if (priorityTargets.length === 0) priorityTargets = aliveEnemies.filter(e => e.role === 'support');
+                if (priorityTargets.length === 0) priorityTargets = aliveEnemies.filter(e => e.role === 'assassin');
+                break;
+            case 'support':
+                // 서포터: 적 서포터 > 적 탱커 > 적 딜러
+                priorityTargets = aliveEnemies.filter(e => e.role === 'support');
+                if (priorityTargets.length === 0) priorityTargets = aliveEnemies.filter(e => e.role === 'tank');
+                if (priorityTargets.length === 0) priorityTargets = aliveEnemies.filter(e => e.role === 'dps');
+                if (priorityTargets.length === 0) priorityTargets = aliveEnemies.filter(e => e.role === 'assassin');
+                break;
+            case 'assassin':
+                // 암살자: 가장 낮은 HP 적
+                priorityTargets = aliveEnemies.sort((a, b) => a.currentHp - b.currentHp);
+                break;
+            default:
+                priorityTargets = aliveEnemies;
+        }
+        
+        if (priorityTargets.length === 0) priorityTargets = aliveEnemies;
+        
+        // 우선순위 내에서 앞라인 우선, 그 다음 거리 순
+        priorityTargets.sort((a, b) => {
+            // 앞라인 우선 (플레이어는 적의 y 낮은 우선, 적은 플레이어의 y 높은 우선)
+            const frontPriorityA = unit.isPlayer ? a.y : (this.battleGrid.height - 1 - a.y);
+            const frontPriorityB = unit.isPlayer ? b.y : (this.battleGrid.height - 1 - b.y);
+            if (frontPriorityA !== frontPriorityB) {
+                return frontPriorityA - frontPriorityB;
+            }
+            // 거리 순
             return this.getDistance(unit, a) - this.getDistance(unit, b);
         });
         
-        return aliveEnemies[0];
+        return priorityTargets[0];
     }
 
     // 거리 계산
@@ -254,7 +305,7 @@ class BattleSystem {
     }
 
     // 이동
-    moveTowards(unit, target) {
+    moveTowards(unit, target, allies, enemies) {
         const dx = target.x - unit.x;
         const dy = target.y - unit.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
@@ -262,15 +313,54 @@ class BattleSystem {
         if (distance === 0) return;
         
         const speed = unit.stats.movementSpeed * (this.updateInterval / 1000);
-        const moveX = (dx / distance) * speed;
-        const moveY = (dy / distance) * speed;
+        let moveX = (dx / distance) * speed;
+        let moveY = (dy / distance) * speed;
+        
+        // 충돌 회피 (적만)
+        const enemyUnits = enemies.filter(u => u !== unit && !u.isDead);
+        for (const other of enemyUnits) {
+            const dist = Math.hypot(other.x - unit.x, other.y - unit.y);
+            if (dist < 0.5) { // 너무 가까우면
+                const avoidDx = unit.x - other.x;
+                const avoidDy = unit.y - other.y;
+                const avoidDist = Math.hypot(avoidDx, avoidDy);
+                if (avoidDist > 0) {
+                    moveX += (avoidDx / avoidDist) * speed * 0.3;
+                    moveY += (avoidDy / avoidDist) * speed * 0.3;
+                }
+            }
+        }
+        
+        // 탱커는 전방으로 추가 이동, 딜러는 후방으로
+        if (unit.role === 'dps') {
+            const backwardSpeed = speed * 0.3;
+            if (unit.isPlayer) {
+                moveY += backwardSpeed; // 후방
+            } else {
+                moveY -= backwardSpeed;
+            }
+        }
+        
+        // 이동 전 경계 체크 (그리드 밖으로 나가지 못하게)
+        const newX = unit.x + moveX;
+        const newY = unit.y + moveY;
+        
+        // x좌표 제한
+        if (newX < 0) {
+            moveX = -unit.x; // 0으로 이동
+        } else if (newX > this.battleGrid.width - 1) {
+            moveX = (this.battleGrid.width - 1) - unit.x; // 최대값으로 이동
+        }
+        
+        // y좌표 제한
+        if (newY < 0) {
+            moveY = -unit.y; // 0으로 이동
+        } else if (newY > this.battleGrid.height - 1) {
+            moveY = (this.battleGrid.height - 1) - unit.y; // 최대값으로 이동
+        }
         
         unit.x += moveX;
         unit.y += moveY;
-        
-        // 그리드 경계 체크
-        unit.x = Math.max(0, Math.min(this.battleGrid.width - 1, unit.x));
-        unit.y = Math.max(0, Math.min(this.battleGrid.height - 1, unit.y));
     }
 
     // 공격
@@ -536,10 +626,11 @@ function generateCreeps(round) {
     // 크립 생성
     for (let i = 0; i < creepCount; i++) {
         creeps.push({
-            id: `creep_${round}_${i}`,
+            id: `creep_${i}`,
             name: creepName,
             cost: 0,
             tier: 1,
+            role: 'dps',
             traits: ['적군'],
             stats: {
                 hp: baseHp,

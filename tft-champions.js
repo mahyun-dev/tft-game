@@ -8,6 +8,7 @@ const CHAMPIONS = [
         name: '훈련병',
         cost: 1,
         tier: 1,
+        role: 'dps',
         traits: ['보병', '신병'],
         stats: {
             hp: 500,
@@ -17,8 +18,8 @@ const CHAMPIONS = [
             armor: 20,
             magicResist: 20,
             attackSpeed: 0.6,
-            attackRange: 1,
-            movementSpeed: 1
+            attackRange: 2,
+            movementSpeed: 2
         },
         skill: {
             name: '제식훈련',
@@ -35,6 +36,7 @@ const CHAMPIONS = [
         name: '운전병',
         cost: 1,
         tier: 1,
+        role: 'assassin',
         traits: ['경수색반', '기동'],
         stats: {
             hp: 550,
@@ -63,6 +65,7 @@ const CHAMPIONS = [
         name: '정비병',
         cost: 1,
         tier: 1,
+        role: 'support',
         traits: ['지원', '정비'],
         stats: {
             hp: 600,
@@ -94,6 +97,7 @@ const CHAMPIONS = [
         name: '통신병',
         cost: 1,
         tier: 1,
+        role: 'support',
         traits: ['지원', '통신'],
         stats: {
             hp: 520,
@@ -124,6 +128,7 @@ const CHAMPIONS = [
         name: '의무병',
         cost: 1,
         tier: 1,
+        role: 'support',
         traits: ['지원', '의무'],
         stats: {
             hp: 580,
@@ -157,6 +162,7 @@ const CHAMPIONS = [
         name: '기관총병',
         cost: 2,
         tier: 2,
+        role: 'dps',
         traits: ['화력지원', 'M60'],
         stats: {
             hp: 700,
@@ -188,6 +194,7 @@ const CHAMPIONS = [
         name: '기계화 보병',
         cost: 2,
         tier: 2,
+        role: 'tank',
         traits: ['기보', '보병'],
         stats: {
             hp: 850,
@@ -218,6 +225,7 @@ const CHAMPIONS = [
         name: '포수',
         cost: 2,
         tier: 2,
+        role: 'dps',
         traits: ['화력지원', '지원반'],
         stats: {
             hp: 650,
@@ -246,6 +254,7 @@ const CHAMPIONS = [
         name: '관측병',
         cost: 2,
         tier: 2,
+        role: 'assassin',
         traits: ['지원반', '정찰'],
         stats: {
             hp: 620,
@@ -275,6 +284,7 @@ const CHAMPIONS = [
         name: '계산병',
         cost: 2,
         tier: 2,
+        role: 'support',
         traits: ['지원반', '전술'],
         stats: {
             hp: 600,
@@ -306,6 +316,7 @@ const CHAMPIONS = [
         name: '경수색반장',
         cost: 2,
         tier: 2,
+        role: 'support',
         traits: ['경수색반', '지휘관'],
         stats: {
             hp: 750,
@@ -336,6 +347,7 @@ const CHAMPIONS = [
         name: '포반장',
         cost: 2,
         tier: 2,
+        role: 'support',
         traits: ['지원반', '지휘관'],
         stats: {
             hp: 700,
@@ -369,6 +381,7 @@ const CHAMPIONS = [
         name: '척후병',
         cost: 3,
         tier: 3,
+        role: 'assassin',
         traits: ['경수색반', '특수전', 'M60'],
         stats: {
             hp: 900,
@@ -408,6 +421,7 @@ const CHAMPIONS = [
         name: '중화기병',
         cost: 3,
         tier: 3,
+        role: 'dps',
         traits: ['중수색반', 'M60', '화력지원'],
         stats: {
             hp: 950,
@@ -444,6 +458,7 @@ const CHAMPIONS = [
         name: '대전차병',
         cost: 3,
         tier: 3,
+        role: 'dps',
         traits: ['기보', '대전차'],
         stats: {
             hp: 800,
@@ -474,6 +489,7 @@ const CHAMPIONS = [
         name: '기보분대장',
         cost: 3,
         tier: 3,
+        role: 'support',
         traits: ['기보', '지휘관'],
         stats: {
             hp: 1100,
@@ -507,6 +523,7 @@ const CHAMPIONS = [
         name: '수색분대장',
         cost: 3,
         tier: 3,
+        role: 'support',
         traits: ['경수색반', '지휘관', '특수전'],
         stats: {
             hp: 950,
@@ -547,6 +564,7 @@ const CHAMPIONS = [
         name: '공병',
         cost: 3,
         tier: 3,
+        role: 'support',
         traits: ['지원', '공병'],
         stats: {
             hp: 1000,
@@ -583,6 +601,7 @@ const CHAMPIONS = [
         name: 'K-1 포수',
         cost: 4,
         tier: 4,
+        role: 'tank',
         traits: ['중수색반', '기갑', '화력지원'],
         stats: {
             hp: 1400,
@@ -616,6 +635,7 @@ const CHAMPIONS = [
         name: 'K-1 조종수',
         cost: 4,
         tier: 4,
+        role: 'tank',
         traits: ['중수색반', '기갑', '기동'],
         stats: {
             hp: 1600,
@@ -649,6 +669,7 @@ const CHAMPIONS = [
         name: '소대장',
         cost: 4,
         tier: 4,
+        role: 'support',
         traits: ['지휘관', '장교'],
         stats: {
             hp: 1200,
@@ -686,6 +707,7 @@ const CHAMPIONS = [
         name: '중대장',
         cost: 4,
         tier: 4,
+        role: 'support',
         traits: ['지휘관', '장교'],
         stats: {
             hp: 1300,
@@ -730,6 +752,7 @@ const CHAMPIONS = [
         name: '저격수',
         cost: 4,
         tier: 4,
+        role: 'assassin',
         traits: ['특수전', '정찰'],
         stats: {
             hp: 850,
@@ -763,6 +786,7 @@ const CHAMPIONS = [
         name: '대대장',
         cost: 5,
         tier: 5,
+        role: 'support',
         traits: ['지휘관', '장교', '전설'],
         stats: {
             hp: 1800,
@@ -802,6 +826,7 @@ const CHAMPIONS = [
         name: '특전사령관',
         cost: 5,
         tier: 5,
+        role: 'support',
         traits: ['특수전', '지휘관', '전설'],
         stats: {
             hp: 1400,
@@ -838,6 +863,7 @@ const CHAMPIONS = [
         name: '원사',
         cost: 5,
         tier: 5,
+        role: 'support',
         traits: ['지휘관', '부사관', '전설'],
         stats: {
             hp: 2000,
@@ -871,6 +897,7 @@ const CHAMPIONS = [
         name: 'K-2 전차장',
         cost: 5,
         tier: 5,
+        role: 'tank',
         traits: ['기갑', '중수색반', '전설'],
         stats: {
             hp: 2200,
@@ -906,6 +933,7 @@ const CHAMPIONS = [
         name: '포병대대장',
         cost: 5,
         tier: 5,
+        role: 'support',
         traits: ['화력지원', '지휘관', '전설'],
         stats: {
             hp: 1500,

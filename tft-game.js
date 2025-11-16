@@ -6,6 +6,7 @@ function cloneUnit(unit) {
     return {
         ...unit,
         stats: { ...unit.stats },
+        baseStats: unit.baseStats ? { ...unit.baseStats } : { ...unit.stats }, // 기본 스탯 저장
         traits: [...unit.traits],
         skill: unit.skill ? {
             name: unit.skill.name,
@@ -68,7 +69,11 @@ class TFTGame {
         this.shop = [];
         
         // 전투 시스템
-        this.battleSystem = new BattleSystem();
+        this.battleSystem = new BattleSystem((playerTeam, enemyTeam) => {
+            if (this.onBattleUpdate) {
+                this.onBattleUpdate(playerTeam, enemyTeam);
+            }
+        });
         
         // 게임 상태
         this.isGameOver = false;
@@ -77,6 +82,7 @@ class TFTGame {
         // 콜백
         this.onTimerUpdate = null;
         this.onBattleStart = null;
+        this.onBattleUpdate = null;
     }
     
     // 살아있는 플레이어들
@@ -270,8 +276,11 @@ class TFTGame {
         }
         
         // 시너지 적용
-        const playerSynergies = applySynergies(this.player.units, this.player.units);
-        const aiSynergies = applySynergies(this.currentOpponent.units, this.currentOpponent.units);
+        const playerSynergyResult = applySynergies(this.player.units, this.player.units);
+        const aiSynergyResult = applySynergies(this.currentOpponent.units, this.currentOpponent.units);
+        
+        const playerUnitsWithSynergies = playerSynergyResult.unitsWithSynergies;
+        const aiUnitsWithSynergies = aiSynergyResult.unitsWithSynergies;
         
         // PVE 라운드 체크
         const isPVE = this.isPVERound(this.round);
@@ -284,7 +293,7 @@ class TFTGame {
         }
         
         // 전투 시작
-        this.battleSystem.startBattle(this.player.units, enemyTeam)
+        this.battleSystem.startBattle(playerUnitsWithSynergies, enemyTeam)
             .then(result => {
                 this.handleBattleResult(result, isPVE);
             });
@@ -393,8 +402,30 @@ class TFTGame {
             return;
         }
         
+        // 전투 후 유닛 스탯 리셋 (시너지 효과 제거)
+        this.resetUnitStats();
+        
         // 다음 라운드는 UI에서 "계속" 버튼을 눌렀을 때 호출됨
         // setTimeout 제거 - 전투가 완료될 때까지 기다림
+    }
+
+    // 전투 후 유닛 스탯 리셋
+    resetUnitStats() {
+        const allUnits = [...this.player.bench, ...this.player.units];
+        allUnits.forEach(unit => {
+            if (unit.baseStats) {
+                // 기본 스탯으로 리셋
+                unit.stats = { ...unit.baseStats };
+                unit.currentHp = unit.stats.hp;
+                
+                // 아이템 효과 재적용
+                if (unit.items) {
+                    unit.items.forEach(item => {
+                        applyItemToUnit(unit, item);
+                    });
+                }
+            }
+        });
     }
 
     // PVE 라운드 체크
@@ -483,10 +514,11 @@ class TFTGame {
             6: [30, 40, 25, 5, 0],
             7: [19, 35, 35, 10, 1],
             8: [16, 20, 35, 25, 4],
-            9: [9, 15, 30, 40, 6]
+            9: [9, 15, 30, 40, 6],
+            10: [0, 0, 0, 0, 100]
         };
         
-        return oddsTable[level] || oddsTable[9];
+        return oddsTable[level] || oddsTable[10];
     }
 
     // 챔피언 롤
@@ -724,12 +756,24 @@ class TFTGame {
                     
                     upgraded.stars = oldStars + 1;
                     
-                    // 스탯 1.8배 증가
-                    upgraded.stats.hp = Math.floor(upgraded.stats.hp * 1.8);
+                    // 기존 아이템 임시 저장 및 제거
+                    const tempItems = [...(upgraded.items || [])];
+                    upgraded.items = [];
+                    
+                    // 기본 스탯 1.8배 증가
+                    upgraded.baseStats.hp = Math.floor(upgraded.baseStats.hp * 1.8);
+                    upgraded.baseStats.attackDamage = Math.floor(upgraded.baseStats.attackDamage * 1.8);
+                    upgraded.baseStats.armor = Math.floor(upgraded.baseStats.armor * 1.8);
+                    upgraded.baseStats.magicResist = Math.floor(upgraded.baseStats.magicResist * 1.8);
+                    
+                    // 현재 스탯을 기본 스탯으로 리셋
+                    upgraded.stats = { ...upgraded.baseStats };
                     upgraded.currentHp = upgraded.stats.hp;
-                    upgraded.stats.attackDamage = Math.floor(upgraded.stats.attackDamage * 1.8);
-                    upgraded.stats.armor = Math.floor(upgraded.stats.armor * 1.8);
-                    upgraded.stats.magicResist = Math.floor(upgraded.stats.magicResist * 1.8);
+                    
+                    // 아이템 효과 재적용
+                    tempItems.forEach(item => {
+                        applyItemToUnit(upgraded, item);
+                    });
                     
                     // 나머지 2개 제거
                     for (let i = 1; i <= 2; i++) {
@@ -882,6 +926,37 @@ function getCreepRewards(round) {
     }
     
     return rewards;
+}
+
+// 아이템을 유닛에 적용하는 함수 (tft-items.js에서 복사)
+function applyItemToUnit(unit, item) {
+    if (!unit.items) unit.items = [];
+    if (unit.items.length >= 3) return false; // 최대 3개 아이템
+    
+    // 기본 스탯 적용
+    if (item.stats) {
+        Object.keys(item.stats).forEach(stat => {
+            if (stat.includes('Multiplier')) {
+                const baseStat = stat.replace('Multiplier', '');
+                unit.stats[baseStat] *= (1 + item.stats[stat]);
+            } else if (['critChance', 'evasion', 'lifesteal', 'damageReduction', 'thornsDamage'].includes(stat)) {
+                unit[stat] = (unit[stat] || 0) + item.stats[stat];
+            } else if (stat === 'hp') {
+                unit.stats.hp += item.stats[stat];
+                unit.currentHp += item.stats[stat];
+            } else {
+                unit.stats[stat] = (unit.stats[stat] || 0) + item.stats[stat];
+            }
+        });
+    }
+    
+    // 특수 효과 플래그
+    if (item.special) {
+        unit[item.special] = true;
+    }
+    
+    unit.items.push(item);
+    return true;
 }
 
 // 게임 인스턴스 생성

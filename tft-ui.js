@@ -9,11 +9,15 @@ let isViewingOtherPlayer = false;
 
 // 유닛 정보 표시
 function showUnitInfo(unit) {
+    // 시너지 적용된 스탯 계산
+    const allUnits = currentGame.player.units;
+    const synergyStats = getUnitStatsWithSynergies(unit, allUnits);
+
     document.getElementById('unitInfoName').textContent = unit.name;
     document.getElementById('unitInfoTier').textContent = unit.tier;
     document.getElementById('unitInfoCost').textContent = unit.cost;
-    document.getElementById('unitInfoHp').textContent = unit.stats.hp;
-    document.getElementById('unitInfoAttack').textContent = unit.stats.attack;
+    document.getElementById('unitInfoHp').textContent = Math.round(synergyStats.hp);
+    document.getElementById('unitInfoAttack').textContent = Math.round(synergyStats.attackDamage);
     document.getElementById('unitInfoItems').textContent = unit.items.map(i => i.name).join(', ') || '없음';
     document.getElementById('unitInfoModal').classList.add('active');
 }
@@ -38,6 +42,7 @@ function initializeGame() {
     currentGame.onGameOver = showGameOver;
     currentGame.onTimerUpdate = updateTimer;
     currentGame.onBattleStart = startBattleSequence;
+    currentGame.onBattleUpdate = updateBattleUnits;
     currentGame.onUpgrade = (name, stars) => {
     };
     
@@ -447,16 +452,35 @@ function updateBench(bench) {
 
 // 상점 업데이트
 function updateShop(shop) {
+    // 코스트별 확률 표시
+    const odds = currentGame.getChampionOdds(currentGame.player.level);
+    const shopHeader = document.querySelector('.shop-header');
+    if (shopHeader) {
+        // 기존 odds 제거
+        const existingOdds = shopHeader.querySelector('.shop-odds');
+        if (existingOdds) existingOdds.remove();
+        
+        const oddsDiv = document.createElement('div');
+        oddsDiv.className = 'shop-odds';
+        oddsDiv.innerHTML = `
+            <div class="odds-item cost-1">${odds[0]}%</div>
+            <div class="odds-item cost-2">${odds[1]}%</div>
+            <div class="odds-item cost-3">${odds[2]}%</div>
+            <div class="odds-item cost-4">${odds[3]}%</div>
+            <div class="odds-item cost-5">${odds[4]}%</div>
+        `;
+        shopHeader.appendChild(oddsDiv);
+    }
+    
     const shopArea = document.getElementById('shopArea');
     shopArea.innerHTML = '';
-    
     
     shop.forEach((champion, index) => {
         const slot = document.createElement('div');
         slot.className = 'shop-slot';
         
         if (champion) {
-            slot.classList.add(`tier-${champion.tier}`);
+            slot.classList.add(`cost-${champion.cost}`);
             slot.innerHTML = `
                 <div class="unit-cost">${champion.cost}</div>
                 <div class="unit-name">${champion.name}</div>
@@ -492,17 +516,22 @@ function createUnitElement(unit, fromBench) {
     // 내 필드일 때만 드래그 가능
     unitEl.draggable = !isViewingOtherPlayer ? true : false;
     const stars = '⭐'.repeat(unit.stars || 1);
+    // 시너지 적용된 스탯 계산
+    const allUnits = currentGame.player.units;
+    const synergyStats = getUnitStatsWithSynergies(unit, allUnits);
+    const displayHp = Math.floor(unit.currentHp || synergyStats.hp);
+
     unitEl.innerHTML = `
         <div class="unit-cost">${unit.cost}</div>
         <div class="unit-name">${unit.name}</div>
-        <div class="unit-hp">HP: ${Math.floor(unit.currentHp || unit.stats.hp)}</div>
+        <div class="unit-hp">HP: ${displayHp}</div>
         <div class="unit-stars">${stars}</div>
     `;
     unitEl.dataset.from = fromBench ? 'bench' : 'field';
     unitEl.dataset.index = fromBench ? currentGame.player.bench.indexOf(unit) : currentGame.player.units.indexOf(unit);
     unitEl.dataset.dragged = 'false';
 
-    // 모바일: 터치로 유닛 선택/배치
+    // 모바일: 터치로 유닛 선택/배치/아이템 장착
     if (!isViewingOtherPlayer && window.innerWidth < 768) {
         unitEl.addEventListener('touchend', (e) => {
             e.preventDefault();
@@ -511,6 +540,16 @@ function createUnitElement(unit, fromBench) {
             if (selectedUnit && selectedUnit.unit === unit && selectedUnit.fromBench === fromBench) {
                 selectedUnit = null;
                 updateUI();
+                return;
+            }
+            // 선택된 아이템이 있으면 장착 시도
+            if (selectedItem) {
+                if (currentGame.equipItem(unit, selectedItem)) {
+                    selectedItem = null;
+                    updateUI();
+                } else {
+                    alert('아이템 장착 실패: 이미 3개의 아이템을 가지고 있거나 호환되지 않습니다.');
+                }
                 return;
             }
             // 유닛 선택
@@ -594,23 +633,28 @@ function createUnitElement(unit, fromBench) {
                     }
                 }
                 // 아이템 장착
-                unit.items.push(combinedItem);
-                currentGame.player.items.splice(parseInt(itemIndex), 1);
-                updateUI();
+                if (applyItemToUnit(unit, combinedItem)) {
+                    currentGame.player.items.splice(parseInt(itemIndex), 1);
+                    updateUI();
+                } else {
+                    alert('유닛은 최대 3개의 아이템만 장착할 수 있습니다!');
+                }
             }
         }
     });
 
-    // 툴팁 이벤트
-    unitEl.addEventListener('mouseenter', (e) => {
-        showChampionTooltip(unit, e);
-    });
-    unitEl.addEventListener('mousemove', (e) => {
-        updateTooltipPosition(e);
-    });
-    unitEl.addEventListener('mouseleave', () => {
-        hideChampionTooltip();
-    });
+    // 툴팁 이벤트 (데스크탑만)
+    if (window.innerWidth >= 768) {
+        unitEl.addEventListener('mouseenter', (e) => {
+            showChampionTooltip(unit, e);
+        });
+        unitEl.addEventListener('mousemove', (e) => {
+            updateTooltipPosition(e);
+        });
+        unitEl.addEventListener('mouseleave', () => {
+            hideChampionTooltip();
+        });
+    }
 
     return unitEl;
 }
@@ -730,7 +774,7 @@ function updateItems(items) {
                 alert(`${item.name}\n${item.description}\n\n유닛에게 드래그하여 장착하거나, 다른 아이템과 조합해보세요.`);
             });
         } else {
-            // 모바일: 터치로 아이템 선택/장착/조합
+            // 모바일: 터치로 아이템 선택
             itemEl.addEventListener('touchend', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -803,6 +847,102 @@ function startBattleSequence() {
     animateBattle();
 }
 
+// 유닛 그리기 함수
+// 티어별 색상
+function getTierColor(tier) {
+    const colors = {
+        1: '#95a5a6',
+        2: '#27ae60',
+        3: '#3498db',
+        4: '#9b59b6',
+        5: '#ffd700'
+    };
+    return colors[tier] || '#fff';
+}
+
+function drawUnit(ctx, unit) {
+    if (unit.currentHp <= 0) return; // 죽은 유닛은 그리지 않음
+    
+    // 유닛 본체 (원)
+    ctx.fillStyle = unit.color;
+    ctx.beginPath();
+    ctx.arc(unit.x, unit.y, unit.size, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // 티어 색상 테두리
+    ctx.strokeStyle = getTierColor(unit.tier);
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    
+    // HP 바
+    const hpBarWidth = unit.size * 2;
+    const hpBarHeight = 6;
+    const hpRatio = unit.currentHp / unit.maxHp;
+    
+    // HP 바 배경
+    ctx.fillStyle = '#333';
+    ctx.fillRect(unit.x - hpBarWidth/2, unit.y - unit.size - 15, hpBarWidth, hpBarHeight);
+    
+    // HP 바
+    ctx.fillStyle = hpRatio > 0.5 ? '#27ae60' : hpRatio > 0.25 ? '#f39c12' : '#e74c3c';
+    ctx.fillRect(unit.x - hpBarWidth/2, unit.y - unit.size - 15, hpBarWidth * hpRatio, hpBarHeight);
+    
+    // 이름
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 12px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(unit.name, unit.x, unit.y + unit.size + 15);
+    
+    // 별
+    if (unit.stars && unit.stars >= 1) {
+        ctx.fillStyle = '#ffd700';
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText('⭐'.repeat(unit.stars), unit.x, unit.y - unit.size - 25);
+    }
+}
+
+// 전투 유닛 실시간 업데이트
+let battleUnits = {
+    player: [],
+    enemy: []
+};
+
+function updateBattleUnits(playerTeam, enemyTeam) {
+    if (!window.battleAnimationRunning) return;
+    
+    // 그리드 설정
+    const cols = 7;
+    const rows = 4;
+    const canvasWidth = 560;
+    const canvasHeight = 720;
+    const gridWidth = canvasWidth;
+    const gridHeight = canvasHeight;
+    const startX = 0;
+    const startY = 0;
+    const cellWidth = gridWidth / cols;
+    const cellHeight = gridHeight / rows;
+    
+    // 플레이어 유닛 위치 업데이트
+    battleUnits.player.forEach((uiUnit, index) => {
+        if (playerTeam[index]) {
+            const battleUnit = playerTeam[index];
+            uiUnit.x = startX + cellWidth * (battleUnit.x + 0.5);
+            uiUnit.y = startY + cellHeight * (3.5 - battleUnit.y);
+            uiUnit.currentHp = battleUnit.currentHp;
+        }
+    });
+    
+    // 적 유닛 위치 업데이트
+    battleUnits.enemy.forEach((uiUnit, index) => {
+        if (enemyTeam[index]) {
+            const battleUnit = enemyTeam[index];
+            uiUnit.x = startX + cellWidth * (battleUnit.x + 0.5);
+            uiUnit.y = startY + cellHeight * (3.5 - battleUnit.y);
+            uiUnit.currentHp = battleUnit.currentHp;
+        }
+    });
+}
+
 // 전투 애니메이션
 function animateBattle() {
     const canvas = document.getElementById('battleCanvas');
@@ -814,10 +954,13 @@ function animateBattle() {
     
     let frame = 0;
     let animationId;
-    let battleUnits = {
+    battleUnits = {
         player: [],
         enemy: []
     };
+    
+    // 전투 유닛 초기화
+    initBattleUnits();
     
     // 전투 유닛 초기화
     function initBattleUnits() {
@@ -834,7 +977,7 @@ function animateBattle() {
         const cellHeight = gridHeight / rows; // 90px
         
         // 플레이어 유닛 - 하단 4행 (행 4-7)
-        battleUnits.player = currentGame.player.units.map((unit) => {
+        battleUnits.player = currentGame.player.units.filter(unit => unit.position).map((unit) => {
             const gridX = unit.position ? unit.position.x : 0; // 0-6
             const gridY = unit.position ? unit.position.y : 0; // 0-3
             
@@ -895,18 +1038,6 @@ function animateBattle() {
                 stars: unit.stars || 1
             };
         });
-    }
-    
-    // 티어별 색상
-    function getTierColor(tier) {
-        const colors = {
-            1: '#95a5a6',
-            2: '#27ae60',
-            3: '#3498db',
-            4: '#9b59b6',
-            5: '#ffd700'
-        };
-        return colors[tier] || '#fff';
     }
     
     // 전투 이펙트
@@ -1037,8 +1168,8 @@ function animateBattle() {
         drawBattleEffects();
         
         // 유닛 그리기
-        battleUnits.player.forEach(drawUnit);
-        battleUnits.enemy.forEach(drawUnit);
+        battleUnits.player.forEach(unit => drawUnit(ctx, unit));
+        battleUnits.enemy.forEach(unit => drawUnit(ctx, unit));
         
         // 유닛 업데이트
         if (frame % 10 === 0) {
@@ -1139,6 +1270,27 @@ function setupBattleResultCallback() {
                     resultMessage.textContent = `AI에게 패배했습니다. ${result.enemyUnitsLeft}명 남음`;
                 }
             }
+            
+            // 자동 진행 타이머 시작
+            let timer = 5;
+            const timerEl = document.getElementById('autoContinueTimer');
+            timerEl.style.display = 'block';
+            timerEl.textContent = `${timer}초 후 자동 진행`;
+            
+            const interval = setInterval(() => {
+                timer--;
+                timerEl.textContent = `${timer}초 후 자동 진행`;
+                if (timer <= 0) {
+                    clearInterval(interval);
+                    // 자동 진행
+                    document.getElementById('battleModal').classList.remove('active');
+                    document.getElementById('battleResult').style.display = 'none';
+                    timerEl.style.display = 'none';
+                    if (currentGame && !currentGame.isGameOver) {
+                        currentGame.nextRound();
+                    }
+                }
+            }, 1000);
         }, 500);
     };
 }
@@ -1157,17 +1309,70 @@ function showChampionTooltip(unit, event) {
         `<span class="tooltip-trait">${trait}</span>`
     ).join('');
     
+    // 역할 표시
+    if (unit.role) {
+        const roleText = {
+            tank: '탱커',
+            dps: '딜러',
+            support: '서포터',
+            assassin: '암살자'
+        }[unit.role] || unit.role;
+        traitsEl.innerHTML += `<span class="tooltip-role">${roleText}</span>`;
+    }
+    
     // 스탯
     const statsEl = document.getElementById('tooltipStats');
     const effectiveStats = calculateUnitStatsWithItems(unit);
     statsEl.innerHTML = `
-        <div class="tooltip-stat-line"><span>체력:</span><span>${effectiveStats.hp}</span></div>
-        <div class="tooltip-stat-line"><span>공격력:</span><span>${effectiveStats.attackDamage}</span></div>
-        <div class="tooltip-stat-line"><span>방어력:</span><span>${effectiveStats.armor}</span></div>
-        <div class="tooltip-stat-line"><span>마법저항:</span><span>${effectiveStats.magicResist}</span></div>
+        <div class="tooltip-stat-line"><span>체력:</span><span>${Math.round(effectiveStats.hp)}</span></div>
+        <div class="tooltip-stat-line"><span>공격력:</span><span>${Math.round(effectiveStats.attackDamage)}</span></div>
+        <div class="tooltip-stat-line"><span>방어력:</span><span>${Math.round(effectiveStats.armor)}</span></div>
+        <div class="tooltip-stat-line"><span>마법저항:</span><span>${Math.round(effectiveStats.magicResist)}</span></div>
         <div class="tooltip-stat-line"><span>공격속도:</span><span>${effectiveStats.attackSpeed.toFixed(2)}</span></div>
-        <div class="tooltip-stat-line"><span>사거리:</span><span>${effectiveStats.attackRange}</span></div>
+        <div class="tooltip-stat-line"><span>사거리:</span><span>${Math.round(effectiveStats.attackRange)}</span></div>
     `;
+    
+    // 아이템 효과 표시
+    if (unit.items && unit.items.length > 0) {
+        let itemEffects = [];
+        unit.items.forEach(item => {
+            if (item.stats) {
+                const effects = [];
+                Object.keys(item.stats).forEach(stat => {
+                    let displayStat = stat;
+                    let value = item.stats[stat];
+                    if (stat === 'hp') displayStat = '체력';
+                    else if (stat === 'attackDamage') displayStat = '공격력';
+                    else if (stat === 'armor') displayStat = '방어력';
+                    else if (stat === 'magicResist') displayStat = '마법저항력';
+                    else if (stat === 'attackSpeedMultiplier') { displayStat = '공격속도'; value = `${(value * 100).toFixed(0)}%`; }
+                    else if (stat === 'attackRange') displayStat = '사거리';
+                    else if (stat === 'evasion') { displayStat = '회피'; value = `${(value * 100).toFixed(0)}%`; }
+                    else if (stat === 'lifesteal') { displayStat = '생명력 흡수'; value = `${(value * 100).toFixed(0)}%`; }
+                    else if (stat === 'damageReduction') { displayStat = '피해 감소'; value = `${(value * 100).toFixed(0)}%`; }
+                    else if (stat === 'thornsDamage') { displayStat = '반사 피해'; value = `${(value * 100).toFixed(0)}%`; }
+                    else if (stat === 'critChance') { displayStat = '치명타 확률'; value = `${(value * 100).toFixed(0)}%`; }
+                    else if (stat === 'critDamage') { displayStat = '치명타 피해'; value = `${(value * 100).toFixed(0)}배`; }
+                    else if (stat === 'mana') displayStat = '마나';
+                    else if (stat === 'hpRegen') displayStat = '초당 체력 회복';
+                    else if (stat === 'manaCostReduction') displayStat = '마나 비용 감소';
+                    else if (stat === 'skillDamageBonus') { displayStat = '스킬 피해'; value = `${(value * 100).toFixed(0)}%`; }
+                    else if (stat === 'movementSpeedMultiplier') { displayStat = '이동속도'; value = `${(value * 100).toFixed(0)}%`; }
+                    else if (stat === 'visionRange') displayStat = '시야 범위';
+                    else if (stat === 'onHitDamage') displayStat = '추가 피해';
+                    else if (stat === 'multiStrike') displayStat = '연속 타격';
+                    else if (stat === 'splashDamage') { displayStat = '광역 피해'; value = `${(value * 100).toFixed(0)}%`; }
+                    effects.push(`${displayStat} +${value}`);
+                });
+                if (effects.length > 0) {
+                    itemEffects.push(`${item.icon} ${item.name}: ${effects.join(', ')}`);
+                }
+            }
+        });
+        if (itemEffects.length > 0) {
+            statsEl.innerHTML += `<div class="tooltip-item-effects" style="margin-top: 10px; font-size: 11px; color: #f39c12; line-height: 1.4;">아이템 효과:<br>${itemEffects.join('<br>')}</div>`;
+        }
+    }
     
     // 스킬
     const skillEl = document.getElementById('tooltipSkill');
