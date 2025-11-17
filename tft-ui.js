@@ -102,6 +102,12 @@ function setupEventListeners() {
         }
     });
     
+    // 우측 패널 토글 (모바일)
+    document.getElementById('toggleRightPanelBtn').addEventListener('click', () => {
+        const rightPanel = document.querySelector('.right-panel');
+        rightPanel.classList.toggle('active');
+    });
+    
     // 모달 닫기
     document.getElementById('continueBattleBtn').addEventListener('click', () => {
         document.getElementById('battleModal').classList.remove('active');
@@ -147,6 +153,27 @@ function setupEventListeners() {
     document.getElementById('scoutPlayerSelect').addEventListener('change', (e) => {
         const playerId = parseInt(e.target.value);
         updateScoutContent(playerId);
+    });
+    
+    // 키보드 입력
+    document.addEventListener('keydown', (e) => {
+        if (!currentGame) return;
+        
+        if (e.code === 'Space') {
+            // 자신 필드 보기
+            currentViewPlayerId = 0;
+            updateUI();
+        } else if (e.code === 'KeyD') {
+            // 상점 새로고침 (리롤)
+            if (currentGame.rerollShop()) {
+                updateUI();
+            }
+        } else if (e.code === 'KeyF') {
+            // 경험치 구매
+            if (currentGame.buyExp()) {
+                updateUI();
+            }
+        }
     });
 }
 
@@ -533,17 +560,35 @@ function createUnitElement(unit, fromBench) {
 
     // 모바일: 터치로 유닛 선택/배치/아이템 장착
     if (!isViewingOtherPlayer && window.innerWidth < 768) {
+        let touchStartX, touchStartY;
+        let isDragging = false;
+        
+        unitEl.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+            isDragging = false;
+            unitEl.classList.add('dragging');
+        }, { passive: false });
+        
+        unitEl.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const deltaX = Math.abs(touch.clientX - touchStartX);
+            const deltaY = Math.abs(touch.clientY - touchStartY);
+            if (deltaX > 10 || deltaY > 10) {
+                isDragging = true;
+            }
+        }, { passive: false });
+        
         unitEl.addEventListener('touchend', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            // 이미 선택된 유닛을 다시 터치하면 선택 해제
-            if (selectedUnit && selectedUnit.unit === unit && selectedUnit.fromBench === fromBench) {
-                selectedUnit = null;
-                updateUI();
-                return;
-            }
-            // 선택된 아이템이 있으면 장착 시도
-            if (selectedItem) {
+            unitEl.classList.remove('dragging');
+            
+            // 드래그 중 아이템 장착 시도
+            if (isDragging && selectedItem) {
                 if (currentGame.equipItem(unit, selectedItem)) {
                     selectedItem = null;
                     updateUI();
@@ -552,9 +597,16 @@ function createUnitElement(unit, fromBench) {
                 }
                 return;
             }
-            // 유닛 선택
-            selectedUnit = { unit, fromBench };
-            updateUI();
+            
+            // 클릭으로 간주 - 유닛 선택 또는 infoPanel 표시
+            if (selectedUnit && selectedUnit.unit === unit && selectedUnit.fromBench === fromBench) {
+                selectedUnit = null;
+                updateUI();
+            } else {
+                selectedUnit = { unit, fromBench };
+                updateMobileInfo(unit, 'unit');
+                updateUI();
+            }
         }, { passive: false });
     }
 
@@ -769,24 +821,45 @@ function updateItems(items) {
                     }
                 }
             });
-            itemEl.addEventListener('click', () => {
+            itemEl.addEventListener('click', (e) => {
                 selectedItem = item;
-                alert(`${item.name}\n${item.description}\n\n유닛에게 드래그하여 장착하거나, 다른 아이템과 조합해보세요.`);
+                showItemTooltip(item, e);
             });
+            itemEl.addEventListener('mouseout', hideItemTooltip);
         } else {
-            // 모바일: 터치로 아이템 선택
+            // 모바일: 터치로 아이템 선택 및 드래그 앤 드랍
+            let touchStartX, touchStartY;
+            let isDragging = false;
+            
+            itemEl.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                touchStartX = touch.clientX;
+                touchStartY = touch.clientY;
+                isDragging = false;
+                selectedItem = item;
+                itemEl.classList.add('dragging');
+                updateMobileInfo(item, 'item');
+            }, { passive: false });
+            
+            itemEl.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const deltaX = Math.abs(touch.clientX - touchStartX);
+                const deltaY = Math.abs(touch.clientY - touchStartY);
+                if (deltaX > 10 || deltaY > 10) {
+                    isDragging = true;
+                }
+            }, { passive: false });
+            
             itemEl.addEventListener('touchend', (e) => {
                 e.preventDefault();
-                e.stopPropagation();
-                // 이미 선택된 아이템을 다시 터치하면 선택 해제
-                if (selectedItem && selectedItem.id === item.id) {
-                    selectedItem = null;
-                    updateUI();
-                    return;
+                itemEl.classList.remove('dragging');
+                if (!isDragging) {
+                    // 클릭으로 간주 - infoPanel에 설명 표시
+                    updateMobileInfo(item, 'item');
                 }
-                // 아이템 선택
-                selectedItem = item;
-                updateUI();
+                // 드래그 끝났을 때 장착 시도는 유닛 터치에서 처리
             }, { passive: false });
         }
         storage.appendChild(itemEl);
@@ -1324,12 +1397,12 @@ function showChampionTooltip(unit, event) {
     const statsEl = document.getElementById('tooltipStats');
     const effectiveStats = calculateUnitStatsWithItems(unit);
     statsEl.innerHTML = `
-        <div class="tooltip-stat-line"><span>체력:</span><span>${Math.round(effectiveStats.hp)}</span></div>
-        <div class="tooltip-stat-line"><span>공격력:</span><span>${Math.round(effectiveStats.attackDamage)}</span></div>
-        <div class="tooltip-stat-line"><span>방어력:</span><span>${Math.round(effectiveStats.armor)}</span></div>
-        <div class="tooltip-stat-line"><span>마법저항:</span><span>${Math.round(effectiveStats.magicResist)}</span></div>
-        <div class="tooltip-stat-line"><span>공격속도:</span><span>${effectiveStats.attackSpeed.toFixed(2)}</span></div>
-        <div class="tooltip-stat-line"><span>사거리:</span><span>${Math.round(effectiveStats.attackRange)}</span></div>
+        <div class="tooltip-stat-line"><span>체력:</span><span>${Math.round(effectiveStats.hp || 0)}</span></div>
+        <div class="tooltip-stat-line"><span>공격력:</span><span>${Math.round(effectiveStats.attackDamage || 0)}</span></div>
+        <div class="tooltip-stat-line"><span>방어력:</span><span>${Math.round(effectiveStats.armor || 0)}</span></div>
+        <div class="tooltip-stat-line"><span>마법저항:</span><span>${Math.round(effectiveStats.magicResist || 0)}</span></div>
+        <div class="tooltip-stat-line"><span>공격속도:</span><span>${(effectiveStats.attackSpeed || 0).toFixed(2)}</span></div>
+        <div class="tooltip-stat-line"><span>사거리:</span><span>${Math.round(effectiveStats.attackRange || 0)}</span></div>
     `;
     
     // 아이템 효과 표시
@@ -1431,6 +1504,81 @@ function hideChampionTooltip() {
     tooltip.style.display = 'none';
 }
 
+// 아이템 툴팁 표시
+function showItemTooltip(item, event) {
+    const tooltip = document.getElementById('itemTooltip');
+    
+    document.getElementById('itemTooltipIcon').textContent = item.icon;
+    document.getElementById('itemTooltipName').textContent = item.name;
+    document.getElementById('itemTooltipDescription').textContent = item.description;
+    
+    // 위치 설정
+    tooltip.style.display = 'block';
+    updateItemTooltipPosition(event);
+}
+
+// 아이템 툴팁 위치 업데이트
+function updateItemTooltipPosition(event) {
+    const tooltip = document.getElementById('itemTooltip');
+    if (tooltip.style.display === 'none') return;
+    
+    const offset = 15;
+    let left = event.clientX + offset;
+    let top = event.clientY + offset;
+    
+    // 화면 밖으로 나가지 않도록 조정
+    const tooltipRect = tooltip.getBoundingClientRect();
+    if (left + tooltipRect.width > window.innerWidth) {
+        left = event.clientX - tooltipRect.width - offset;
+    }
+    if (top + tooltipRect.height > window.innerHeight) {
+        top = event.clientY - tooltipRect.height - offset;
+    }
+    
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+}
+
+// 아이템 툴팁 숨김
+function hideItemTooltip() {
+    const tooltip = document.getElementById('itemTooltip');
+    tooltip.style.display = 'none';
+}
+
+// 모바일 정보 패널 업데이트
+function updateMobileInfo(obj, type) {
+    const panel = document.getElementById('mobileInfoPanel');
+    const content = document.getElementById('mobileInfoContent');
+    
+    if (type === 'item') {
+        content.innerHTML = `
+            <div class="mobile-info-header">
+                <span class="mobile-info-icon">${obj.icon}</span>
+                <span class="mobile-info-name">${obj.name}</span>
+            </div>
+            <div class="mobile-info-desc">${obj.description}</div>
+        `;
+    } else if (type === 'unit') {
+        const effectiveStats = calculateUnitStatsWithItems(obj);
+        content.innerHTML = `
+            <div class="mobile-info-header">
+                <span class="mobile-info-name">${obj.name}</span>
+                <span class="mobile-info-cost">${obj.cost} 💰 ${'⭐'.repeat(obj.stars || 1)}</span>
+            </div>
+            <div class="mobile-info-traits">${obj.traits.map(t => `<span class="mobile-trait">${t}</span>`).join('')}</div>
+            <div class="mobile-info-stats">
+                <div>체력: ${Math.round(effectiveStats.hp || 0)}</div>
+                <div>공격력: ${Math.round(effectiveStats.attackDamage || 0)}</div>
+                <div>방어력: ${Math.round(effectiveStats.armor || 0)}</div>
+                <div>공격속도: ${(effectiveStats.attackSpeed || 0).toFixed(2)}</div>
+            </div>
+            ${obj.skill ? `<div class="mobile-info-skill"><strong>${obj.skill.name}:</strong> ${obj.skill.description}</div>` : ''}
+        `;
+    }
+    
+    panel.style.display = 'block';
+}
+
 // 스카우트 모달 열기
 function openScoutModal(playerId) {
     const modal = document.getElementById('scoutModal');
@@ -1503,4 +1651,44 @@ function updateScoutContent(playerId) {
         }
     }
     
+}
+
+// 아이템 툴팁 표시
+function showItemTooltip(item, event) {
+    const tooltip = document.getElementById('itemTooltip');
+    const iconEl = document.getElementById('itemTooltipIcon');
+    const nameEl = document.getElementById('itemTooltipName');
+    const descEl = document.getElementById('itemTooltipDescription');
+    
+    iconEl.textContent = item.icon;
+    nameEl.textContent = item.name;
+    descEl.textContent = item.description;
+    
+    tooltip.style.display = 'block';
+    updateItemTooltipPosition(event);
+}
+
+// 아이템 툴팁 숨김
+function hideItemTooltip() {
+    const tooltip = document.getElementById('itemTooltip');
+    tooltip.style.display = 'none';
+}
+
+// 아이템 툴팁 위치 업데이트
+function updateItemTooltipPosition(event) {
+    const tooltip = document.getElementById('itemTooltip');
+    const rect = tooltip.getBoundingClientRect();
+    let x = event.clientX + 10;
+    let y = event.clientY + 10;
+    
+    // 화면 밖으로 나가지 않게 조정
+    if (x + rect.width > window.innerWidth) {
+        x = event.clientX - rect.width - 10;
+    }
+    if (y + rect.height > window.innerHeight) {
+        y = event.clientY - rect.height - 10;
+    }
+    
+    tooltip.style.left = x + 'px';
+    tooltip.style.top = y + 'px';
 }

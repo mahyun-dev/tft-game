@@ -55,6 +55,7 @@
                         <option value="hard">어려움</option>
                     </select>
                 </div>
+                <button id="toggleRightPanelBtn" class="btn btn-secondary">📊 순위</button>
                 <button id="newGameBtn" class="btn btn-primary">새 게임</button>
             </div>
         </header>
@@ -148,6 +149,11 @@
                     <div id="playerListContainer" class="player-list-items">
                         <!-- 플레이어 목록 -->
                     </div>
+                </div>
+                
+                <!-- 모바일 정보 패널 -->
+                <div id="mobileInfoPanel" class="mobile-info-panel">
+                    <div id="mobileInfoContent"></div>
                 </div>
             </aside>
         </div>
@@ -292,6 +298,30 @@
                 <p><strong>공격력:</strong> <span id="unitInfoAttack"></span></p>
                 <p><strong>아이템:</strong> <span id="unitInfoItems">없음</span></p>
             </div>
+        </div>
+    </div>
+    
+    <!-- 아이템 툴팁 -->
+    <div id="itemTooltip" class="tooltip">
+        <div class="tooltip-content">
+            <div class="tooltip-header">
+                <span id="itemTooltipIcon"></span>
+                <span id="itemTooltipName"></span>
+            </div>
+            <div id="itemTooltipDescription"></div>
+        </div>
+    </div>
+    
+    <!-- 챔피언 툴팁 -->
+    <div id="championTooltip" class="tooltip">
+        <div class="tooltip-content">
+            <div class="tooltip-header">
+                <span id="tooltipName"></span>
+                <span id="tooltipCost"></span>
+            </div>
+            <div id="tooltipTraits"></div>
+            <div id="tooltipStats"></div>
+            <div id="tooltipSkill"></div>
         </div>
     </div>
 </body>

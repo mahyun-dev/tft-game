@@ -27,6 +27,7 @@ class AIPlayer {
         this.bench = [];
         this.health = 100;
         this.items = [];
+        this.shop = []; // 각 AI별 독립 상점
         this.strategy = this.selectStrategy();
     }
 
@@ -46,6 +47,7 @@ class AIPlayer {
 
     // AI 턴 실행
     takeTurn(shop, round) {
+        // 상점은 이제 각 AI별로 독립적임, shop 파라미터는 무시
         // 1. 레벨업 결정 (여러 번 시도 가능)
         let expBought = 0;
         while (expBought < 3 && this.decideLevelUp()) {
@@ -53,7 +55,7 @@ class AIPlayer {
         }
         
         // 2. 챔피언 구매
-        this.buyChampions(shop);
+        this.buyChampions(this.shop);
         
         // 3. 챔피언 배치
         this.positionUnits();
@@ -468,6 +470,8 @@ class AIPlayer {
         );
         
         if (strategyUnits.length < 4 && this.gold >= 20) {
+            this.refreshShop(); // 리롤 시 상점 리프레시
+            this.gold -= 2;
             return true;
         }
         
@@ -480,6 +484,8 @@ class AIPlayer {
             case 'normal':
                 // 특정 상황에서만
                 if (round >= 10 && this.units.length < this.level && this.gold >= 30) {
+                    this.refreshShop();
+                    this.gold -= 2;
                     return Math.random() < 0.3;
                 }
                 break;
@@ -487,12 +493,154 @@ class AIPlayer {
             case 'hard':
                 // 공격적 리롤
                 if (round >= 8 && this.gold >= 30) {
+                    this.refreshShop();
+                    this.gold -= 2;
                     return Math.random() < 0.5;
                 }
                 break;
         }
         
         return false;
+    }
+
+    // 상점 리프레시 (AI용)
+    refreshShop() {
+        this.shop = [];
+        
+        // 레벨에 따른 확률 (플레이어와 동일)
+        const odds = this.getChampionOdds(this.level);
+        
+        for (let i = 0; i < 5; i++) {
+            const champion = this.rollChampion(odds);
+            this.shop.push(cloneUnitForAI(champion));
+        }
+    }
+
+    // 챔피언 확률 (레벨별)
+    getChampionOdds(level) {
+        const oddsTable = {
+            1: [100, 0, 0, 0, 0],
+            2: [100, 0, 0, 0, 0],
+            3: [75, 25, 0, 0, 0],
+            4: [55, 30, 15, 0, 0],
+            5: [45, 33, 20, 2, 0],
+            6: [30, 40, 25, 5, 0],
+            7: [19, 35, 35, 10, 1],
+            8: [16, 20, 35, 25, 4],
+            9: [9, 15, 30, 40, 6],
+            10: [0, 0, 0, 0, 100]
+        };
+        
+        return oddsTable[level] || oddsTable[10];
+    }
+
+    // 챔피언 롤 (AI용)
+    rollChampion(odds) {
+        const random = Math.random() * 100;
+        let cumulative = 0;
+        let tier = 1;
+        
+        for (let i = 0; i < odds.length; i++) {
+            cumulative += odds[i];
+            if (random < cumulative) {
+                tier = i + 1;
+                break;
+            }
+        }
+        
+        // 해당 티어의 챔피언 중 가중치 기반 선택
+        const tierChampions = getChampionsByCost(tier);
+        const allCounts = this.getAllPlayersChampionCounts();
+        
+        // 각 챔피언의 가중치 계산
+        const weights = tierChampions.map(champion => {
+            // 3성 하나 있으면 그 챔피언은 더 이상 안 나옴
+            if ((allCounts[`${champion.id}_3`] || 0) >= 1) {
+                return 0;
+            }
+            
+            // 1성, 2성, 3성 모두 고려
+            const starsOptions = [1, 2, 3];
+            let totalWeight = 0;
+            
+            starsOptions.forEach(stars => {
+                const key = `${champion.id}_${stars}`;
+                const currentCount = allCounts[key] || 0;
+                const maxCopies = this.getMaxCopiesForChampion(champion.id, stars);
+                
+                // 이미 최대 보유량에 도달했으면 이 별 수는 가중치 0
+                if (currentCount >= maxCopies) {
+                    return;
+                }
+                
+                // 보유량에 따라 가중치 계산
+                let weight = 100;
+                const ratio = currentCount / maxCopies;
+                if (ratio >= 0.9) {
+                    weight = 10;
+                } else if (ratio >= 0.75) {
+                    weight = 25;
+                } else if (ratio >= 0.5) {
+                    weight = 50;
+                }
+                
+                totalWeight += weight;
+            });
+            
+            return totalWeight;
+        });
+        
+        // 가중치 기반 랜덤 선택
+        const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+        if (totalWeight === 0) {
+            return tierChampions[Math.floor(Math.random() * tierChampions.length)];
+        }
+        
+        let randomWeight = Math.random() * totalWeight;
+        for (let i = 0; i < tierChampions.length; i++) {
+            randomWeight -= weights[i];
+            if (randomWeight <= 0) {
+                return tierChampions[i];
+            }
+        }
+        
+        return tierChampions[Math.floor(Math.random() * tierChampions.length)];
+    }
+
+    // 모든 플레이어 챔피언 보유량 계산 (별 수별)
+    getAllPlayersChampionCounts() {
+        // 게임에서 모든 플레이어의 유닛을 카운트
+        const counts = {};
+        if (window.currentGame && window.currentGame.players) {
+            window.currentGame.players.forEach(player => {
+                [...player.units, ...player.bench].forEach(unit => {
+                    const key = `${unit.id}_${unit.stars || 1}`;
+                    counts[key] = (counts[key] || 0) + 1;
+                });
+            });
+        }
+        return counts;
+    }
+
+    // 챔피언별 최대 보유량 (별 수별)
+    getMaxCopiesForChampion(championId, stars) {
+        // 3성은 1장으로 제한 (하나 찍으면 더 이상 안 나옴)
+        if (stars === 3) return 1;
+        // 2성은 6개
+        if (stars === 2) return 6;
+        
+        // 1성은 코스트별 기본값
+        const champion = CHAMPIONS.find(c => c.id === championId);
+        if (!champion) return 9;
+        
+        const baseMax = {
+            1: 22,
+            2: 20,
+            3: 17,
+            4: 10,
+            5: 9
+        };
+        return baseMax[champion.cost] || 9;
     }
 
     // 레벨업 비용

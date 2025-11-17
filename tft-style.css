@@ -697,6 +697,39 @@ body {
     backdrop-filter: blur(10px);
 }
 
+/* 아이템 툴팁 */
+.tooltip {
+    position: fixed;
+    background: rgba(20, 20, 20, 0.98);
+    border: 2px solid var(--gold);
+    border-radius: 10px;
+    padding: 15px;
+    min-width: 200px;
+    max-width: 300px;
+    z-index: 10000;
+    pointer-events: none;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(10px);
+    display: none;
+}
+
+/* 모바일 툴팁 */
+@media (max-width: 767px) {
+    .tooltip {
+        min-width: 60px;
+        max-width: 120px;
+        padding: 3px;
+        font-size: 8px;
+    }
+    
+    .champion-tooltip {
+        min-width: 80px;
+        max-width: 150px;
+        padding: 3px;
+        font-size: 8px;
+    }
+}
+
 .tooltip-header {
     display: flex;
     justify-content: space-between;
@@ -1480,10 +1513,9 @@ body {
     }
 }
 
-/* PC 큰 화면에서 플레이어 순위 창 확대 */
-@media (min-width: 1200px) {
-    .player-list {
-        min-height: 500px;
+/* 모바일 스타일 */
+@media (max-width: 767px) {
+    .right-panel {
+        display: none; /* 모바일에서는 오른쪽 패널 숨김 */
     }
 }
-

@@ -21,6 +21,9 @@ function cloneUnit(unit) {
 
 class TFTGame {
     constructor() {
+        // 글로벌 챔피언 카운트 초기화
+        window.globalChampionCounts = {};
+        
         this.round = 0;
         this.stage = 1;
         this.phase = 'planning'; // 'planning', 'battle', 'results'
@@ -125,6 +128,9 @@ class TFTGame {
             const tier1Champions = CHAMPIONS.filter(c => c.cost === 1);
             const randomChampion = tier1Champions[Math.floor(Math.random() * tier1Champions.length)];
             ai.bench.push(cloneUnit(randomChampion));
+            
+            // AI 상점 초기화
+            ai.refreshShop();
         });
         
         // 시작 시 1코스트 랜덤 챔피언 1개 지급
@@ -184,7 +190,8 @@ class TFTGame {
         // 모든 살아있는 AI 턴 실행
         this.aiPlayers.forEach(ai => {
             if (ai.isAlive) {
-                ai.takeTurn(this.shop, this.round);
+                ai.refreshShop(); // 각 AI별 상점 리프레시
+                ai.takeTurn(ai.shop, this.round, this.getAllPlayersChampionCounts());
             }
         });
         
@@ -375,8 +382,12 @@ class TFTGame {
                     return;
                 }
             } else {
-                // PVE 패배
-                this.player.health -= Math.floor(this.round / 2);
+                // PVE 패배 - 생존한 크립 수에 따른 피해
+                const damage = this.battleSystem.calculateDamage(
+                    result.enemyTeam.filter(u => !u.isDead),
+                    1 // 크립 레벨은 1로 가정
+                );
+                this.player.health -= damage;
                 
                 if (this.player.health <= 0) {
                     this.player.health = 0;
@@ -503,6 +514,52 @@ class TFTGame {
         }
     }
 
+    // 모든 플레이어 챔피언 보유량 계산 (코스트별 총 재고량)
+    getAllPlayersChampionCounts() {
+        const counts = {};
+        const allPlayers = [this.player, ...this.aiPlayers];
+        
+        allPlayers.forEach(player => {
+            if (!player.isAlive) return;
+            const allUnits = [...player.bench, ...player.units];
+            
+            allUnits.forEach(unit => {
+                const key = `${unit.id}_${unit.stars || 1}`;
+                counts[key] = (counts[key] || 0) + 1;
+            });
+        });
+        
+        // 글로벌 counts와 병합 (팔 때 재고 회복용)
+        if (window.globalChampionCounts) {
+            Object.keys(window.globalChampionCounts).forEach(id => {
+                counts[id] = (counts[id] || 0) + window.globalChampionCounts[id];
+            });
+        }
+        
+        return counts;
+    }
+
+    // 챔피언별 최대 보유량 (별 수별)
+    getMaxCopiesForChampion(championId, stars) {
+        // 3성은 1장으로 제한 (하나 찍으면 더 이상 안 나옴)
+        if (stars === 3) return 1;
+        // 2성은 6개
+        if (stars === 2) return 6;
+        
+        // 1성은 코스트별 기본값
+        const champion = CHAMPIONS.find(c => c.id === championId);
+        if (!champion) return 9;
+        
+        const baseMax = {
+            1: 22,
+            2: 20,
+            3: 17,
+            4: 10,
+            5: 9
+        };
+        return baseMax[champion.cost] || 9;
+    }
+
     // 챔피언 확률 (레벨별)
     getChampionOdds(level) {
         const oddsTable = {
@@ -535,8 +592,64 @@ class TFTGame {
             }
         }
         
-        // 해당 티어의 챔피언 중 랜덤 선택
+        // 해당 티어의 챔피언 중 가중치 기반 선택
         const tierChampions = getChampionsByCost(tier);
+        const allCounts = this.getAllPlayersChampionCounts();
+        
+        // 각 챔피언의 가중치 계산 (별 수별 기반)
+        const weights = tierChampions.map(champion => {
+            // 3성 하나 있으면 그 챔피언은 더 이상 안 나옴
+            if ((allCounts[`${champion.id}_3`] || 0) >= 1) {
+                return 0;
+            }
+            
+            // 1성, 2성, 3성 모두 고려
+            const starsOptions = [1, 2, 3];
+            let totalWeight = 0;
+            
+            starsOptions.forEach(stars => {
+                const key = `${champion.id}_${stars}`;
+                const currentCount = allCounts[key] || 0;
+                const maxCopies = this.getMaxCopiesForChampion(champion.id, stars);
+                
+                // 이미 최대 보유량에 도달했으면 이 별 수는 가중치 0
+                if (currentCount >= maxCopies) {
+                    return;
+                }
+                
+                // 보유량에 따라 가중치 계산
+                let weight = 100;
+                const ratio = currentCount / maxCopies;
+                if (ratio >= 0.9) {
+                    weight = 10;
+                } else if (ratio >= 0.75) {
+                    weight = 25;
+                } else if (ratio >= 0.5) {
+                    weight = 50;
+                }
+                
+                totalWeight += weight;
+            });
+            
+            return totalWeight;
+        });
+        
+        // 가중치 기반 랜덤 선택
+        const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+        if (totalWeight === 0) {
+            // 모든 챔피언이 최대 재고량에 도달했으면 랜덤 선택
+            return tierChampions[Math.floor(Math.random() * tierChampions.length)];
+        }
+        
+        let randomWeight = Math.random() * totalWeight;
+        for (let i = 0; i < tierChampions.length; i++) {
+            randomWeight -= weights[i];
+            if (randomWeight <= 0) {
+                return tierChampions[i];
+            }
+        }
+        
+        // fallback
         return tierChampions[Math.floor(Math.random() * tierChampions.length)];
     }
 
@@ -579,6 +692,15 @@ class TFTGame {
         // 판매 가격 (별 수에 따라)
         const sellPrice = unit.cost * (unit.stars || 1);
         this.player.gold += sellPrice;
+        
+        // 재고 회복 (별 수만큼)
+        // 글로벌 counts 조정 (임시로)
+        if (window.globalChampionCounts) {
+            const key = `${unit.id}_${unit.stars || 1}`;
+            if (!window.globalChampionCounts[key]) window.globalChampionCounts[key] = 0;
+            window.globalChampionCounts[key] -= unit.stars || 1;
+            if (window.globalChampionCounts[key] < 0) window.globalChampionCounts[key] = 0;
+        }
         
         // 제거
         source.splice(index, 1);
@@ -966,4 +1088,77 @@ function startNewGame(difficulty = 'normal') {
     game = new TFTGame();
     game.start();
     return game;
+}
+
+// PVE 크립 생성
+function generateCreeps(round) {
+    const creeps = [];
+    
+    // 라운드별 크립 설정 (점진적 난이도 증가)
+    let creepCount, baseHp, baseDamage, creepName;
+    
+    if (round === 1) {
+        creepCount = 1;
+        baseHp = 250;
+        baseDamage = 25;
+        creepName = '적 훈련병';
+    } else if (round === 2) {
+        creepCount = 2;
+        baseHp = 350;
+        baseDamage = 30;
+        creepName = '적 훈련병';
+    } else if (round === 3) {
+        creepCount = 2;
+        baseHp = 500;
+        baseDamage = 40;
+        creepName = '적 일반병';
+    } else if (round <= 10) {
+        // 라운드 4-10
+        creepCount = Math.min(2 + Math.floor(round / 2), 5);
+        baseHp = 400 + (round - 3) * 100;
+        baseDamage = 35 + (round - 3) * 10;
+        creepName = '적 정예병';
+    } else if (round <= 20) {
+        // 라운드 11-20
+        creepCount = Math.min(4 + Math.floor(round / 3), 6);
+        baseHp = 1000 + (round - 10) * 150;
+        baseDamage = 70 + (round - 10) * 15;
+        creepName = '적 중대';
+    } else {
+        // 라운드 21+
+        creepCount = Math.min(6 + Math.floor(round / 5), 8);
+        baseHp = 2500 + (round - 20) * 250;
+        baseDamage = 120 + (round - 20) * 20;
+        creepName = '적 특수부대';
+    }
+    
+    // 크립 생성
+    for (let i = 0; i < creepCount; i++) {
+        creeps.push({
+            id: `creep_${i}`,
+            name: creepName,
+            cost: 0,
+            tier: 1,
+            role: 'dps',
+            traits: ['적군'],
+            stats: {
+                hp: baseHp,
+                mana: 0,
+                maxMana: 999,
+                attackDamage: baseDamage,
+                armor: 15 + round * 3,
+                magicResist: 15 + round * 3,
+                attackSpeed: 0.6,
+                attackRange: 1,
+                movementSpeed: 1
+            },
+            skill: null, // 크립은 스킬 없음
+            position: {
+                x: i % 7,
+                y: Math.floor(i / 7)
+            }
+        });
+    }
+    
+    return creeps;
 }

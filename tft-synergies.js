@@ -757,7 +757,15 @@ function getUnitStatsWithSynergies(unit, allUnits) {
     const allUnitsCopy = allUnits.map(u => JSON.parse(JSON.stringify(u)));
 
     // 기본 스탯으로 리셋 (아이템 효과 포함)
-    tempUnit.stats = { ...tempUnit.baseStats };
+    tempUnit.stats = { ...tempUnit.baseStats } || { ...tempUnit.stats } || {
+        hp: 100,
+        attackDamage: 10,
+        armor: 0,
+        magicResist: 0,
+        attackSpeed: 0.6,
+        attackRange: 1,
+        movementSpeed: 1
+    };
     // 아이템 효과 재적용
     if (tempUnit.items) {
         tempUnit.items.forEach(item => {

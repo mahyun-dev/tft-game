@@ -969,9 +969,24 @@ function getChampionById(id) {
     return CHAMPIONS.find(c => c.id === id);
 }
 
-// 코스트로 챔피언 필터링
+// 코스트로 챔피언 필터링 (롤토체스 재고량 제한 적용)
 function getChampionsByCost(cost) {
-    return CHAMPIONS.filter(c => c.cost === cost);
+    const allChampions = CHAMPIONS.filter(c => c.cost === cost);
+    
+    // 코스트별 최대 재고량
+    const maxStock = {
+        1: 22,
+        2: 20,
+        3: 17,
+        4: 10,
+        5: 9
+    };
+    
+    const limit = maxStock[cost] || allChampions.length;
+    
+    // 랜덤하게 제한된 수만큼 선택 (항상 같은 순서로 나오도록 정렬 후 선택)
+    allChampions.sort((a, b) => a.id.localeCompare(b.id));
+    return allChampions.slice(0, limit);
 }
 
 // 특성으로 챔피언 필터링

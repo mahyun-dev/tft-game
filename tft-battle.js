@@ -53,7 +53,8 @@ class BattleSystem {
                 isDead: false,
                 stunned: false,
                 buffAttackDamage: 0,
-                shield: 0
+                shield: 0,
+                skillUsed: false
             };
             
             // 아이템 효과 적용
@@ -218,9 +219,10 @@ class BattleSystem {
             if (!unit.target) return;
             
             // 스킬 사용 (마나가 가득 찬 경우)
-            if (unit.currentMana >= unit.stats.maxMana) {
+            if (unit.currentMana >= unit.stats.maxMana && unit.skill && !unit.skillUsed) {
                 this.castSkill(unit, allies, enemies);
                 unit.currentMana = 0;
+                unit.skillUsed = true;
             }
             
             // 공격 쿨다운 감소
@@ -297,6 +299,14 @@ class BattleSystem {
         });
         
         return priorityTargets[0];
+    }
+
+    // 스킬 시전
+    castSkill(unit, allies, enemies) {
+        console.log('스킬 시전:', unit.isPlayer ? '플레이어' : '적', unit.name, '스킬 사용', 'mana:', unit.currentMana, '/', unit.stats.maxMana, 'skill:', !!unit.skill, 'used:', unit.skillUsed);
+        if (unit.skill && unit.skill.effect) {
+            unit.skill.effect(unit, unit.target, allies, enemies);
+        }
     }
 
     // 거리 계산
@@ -506,6 +516,8 @@ class BattleSystem {
         try {
             if (typeof unit.skill.effect === 'function') {
                 unit.skill.effect(unit, target, allies, enemies);
+                // 스킬 사용 로그 (디버깅용)
+                console.log(`${unit.isPlayer ? '플레이어' : '적'} 유닛 ${unit.name}이(가) 스킬 ${unit.skill.name}을(를) 사용했습니다.`);
             } else {
                 console.error('Skill effect is not a function:', unit.skill);
             }
@@ -659,3 +671,26 @@ function simulateBattle(team1, team2) {
     const battle = new BattleSystem();
     return battle.startBattle(team1, team2);
 }
+
+// TFT 피해 계산 (생존한 적 기물 수에 따른 피해)
+BattleSystem.prototype.calculateDamage = function(survivingUnits, level) {
+    const survivingCount = survivingUnits.length;
+    
+    const baseDamage = 3;
+    const additionalDamageTable = {
+        0: 0,
+        1: 2,
+        2: 4,
+        3: 6,
+        4: 8,
+        5: 10,
+        6: 11,
+        7: 12,
+        8: 13,
+        9: 14
+    };
+    
+    const additionalDamage = additionalDamageTable[survivingCount] || 14; // 9마리 이상은 14
+    
+    return baseDamage + additionalDamage;
+};
